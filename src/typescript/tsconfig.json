@@ -1,0 +1,41 @@
+{
+  "compilerOptions": {
+    "declaration": false,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": false,
+    "lib": [
+      "esnext"
+    ],
+    "allowJs": true,
+    "moduleResolution": "node",
+    "module": "esnext",
+    "target": "es2017",
+    "esModuleInterop": true,
+    "removeComments": false,
+    "preserveConstEnums": false,
+    "skipDefaultLibCheck": true,
+    "skipLibCheck": true,
+    "newLine": "LF",
+    "sourceMap": true,
+    "stripInternal": true,
+    "importHelpers": true,
+    "noImplicitAny": true,
+    "strict": true,
+    "strictNullChecks": true,
+    "strictBindCallApply": true,
+    "resolveJsonModule": true,
+    "alwaysStrict": true,
+    "noFallthroughCasesInSwitch": true,
+    "downlevelIteration": false,
+    "allowSyntheticDefaultImports": true,
+    "allowUnreachableCode": false,
+    "importsNotUsedAsValues": "error",
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+  },
+  "exclude": [
+    "node_modules",
+    "build",
+    "dist"
+  ]
+}

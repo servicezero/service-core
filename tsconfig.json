@@ -1,0 +1,22 @@
+{
+  "extends": "./src/typescript/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "outDir": "build",
+    "paths": {
+      "@service-core/*": [
+        "src/*"
+      ]
+    }
+  },
+  "include": [
+    "src",
+    "src/global.d.ts",
+    "src/**/.*"
+  ],
+  "exclude": [
+    "node_modules",
+    "build",
+    "dist"
+  ]
+}
