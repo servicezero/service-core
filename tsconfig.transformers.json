@@ -1,0 +1,22 @@
+{
+  "extends": "./src/typescript/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "module": "CommonJS",
+    "outDir": "build/.transformers",
+    "paths": {
+      "@service-core/*": [
+        "src/*"
+      ]
+    }
+  },
+  "include": [
+    "src/typescript",
+    "src/global.d.ts",
+  ],
+  "exclude": [
+    "node_modules",
+    "build",
+    "dist"
+  ]
+}
