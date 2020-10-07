@@ -78,6 +78,53 @@ describe("Logger", () => {
     })
   })
 
+  it("with concurrent contexts", async() => {
+    const log = logger.withLabels({}, true)
+
+    const fn1 = async() => {
+      await log.info("A")
+      return "A"
+    }
+
+    const fn2 = async() => {
+      const msg = `${ await fn1() }_B`
+      await log.error(msg)
+    }
+
+    let cids = 0
+    const fn = async() => {
+      const cid = cids++
+      await log.withContext({ cid: cid.toString() }, () => fn2())
+    }
+    await Promise.all([ fn(), fn() ])
+
+    expect(mockLogWriter).toHaveBeenCalledTimes(4)
+    expect(mockLogWriter).toHaveBeenCalledWith({
+      cid:       "0",
+      message:   "A",
+      severity:  Severity.Information,
+      timestamp: timestampMatcher,
+    })
+    expect(mockLogWriter).toHaveBeenCalledWith({
+      cid:       "0",
+      message:   "A_B",
+      severity:  Severity.Error,
+      timestamp: timestampMatcher,
+    })
+    expect(mockLogWriter).toHaveBeenCalledWith({
+      cid:       "1",
+      message:   "A",
+      severity:  Severity.Information,
+      timestamp: timestampMatcher,
+    })
+    expect(mockLogWriter).toHaveBeenCalledWith({
+      cid:       "1",
+      message:   "A_B",
+      severity:  Severity.Error,
+      timestamp: timestampMatcher,
+    })
+  })
+
   it("converts all values into valid params object", async() => {
     await logger
       .withLabels({}, true)

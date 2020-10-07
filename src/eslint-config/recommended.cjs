@@ -5,7 +5,6 @@ module.exports = {
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",  // Uses the recommended rules from the @typescript-eslint/eslint-plugin
     "plugin:jest/recommended",
-    "plugin:ts-immutable/recommended",
   ],
   globals: {
     console: "readonly",
@@ -26,7 +25,7 @@ module.exports = {
     "filenames",
     "jest",
     "sort-keys-fix",
-    "ts-immutable",
+    "functional",
   ],
   rules: {
     "@typescript-eslint/ban-ts-comment": "off",
@@ -154,6 +153,7 @@ module.exports = {
     "filenames/match-regex": [2, "^[a-z]+[a-z0-9-]+(\\.[a-zA-Z0-9]+)?(\\.(spec|int))?$", true],
     "filenames/no-index": "off",
     "indent": ["error", 2],
+    "jest/expect-expect": "off",
     "key-spacing": ["error", { align: "value" }],
     "no-console": ["error"],
     "no-constant-condition": "off",
@@ -189,10 +189,8 @@ module.exports = {
     "sort-keys-fix/sort-keys-fix": ["error", "asc", {"caseSensitive": true, "natural": true}],
     "space-before-blocks": ["error", "never"],
     "template-curly-spacing": ["error", "always"],
-    "ts-immutable/no-let": "off",
-    "ts-immutable/immutable-data": "off",
-    "ts-immutable/no-method-signature": "off",
-    "ts-immutable/prefer-readonly-types": ["error", {"ignoreLocal": true}],
+    "functional/no-let": ["error", { "allowLocalMutation": true }],
+    "functional/prefer-readonly-type": ["error", {"allowLocalMutation": true, "ignoreClass": true, "ignoreCollections": true}],
   },
   settings: {
     "import/resolver": {

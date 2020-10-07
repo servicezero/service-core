@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "async_hooks"
+
 export interface ILogLabels{
   readonly [key: string]: string
 }
@@ -30,7 +32,27 @@ export enum Severity{
 }
 
 const defaultLogRedactor: ILogRedactor = property => /^(pass|passwords?|phones?|mobiles?|emails?|address)$/i.test(property)
-const consoleLogWriter: ILogWriter = async entry => {
+
+const severityToConsoleMethod: { readonly [P in Severity]: keyof Pick<Console, "debug" | "error" | "info" | "warn"> } = {
+  [Severity.Debug]:       "debug",
+  [Severity.Information]: "info",
+  [Severity.Warning]:     "warn",
+  [Severity.Error]:       "error",
+  [Severity.Fatal]:       "error",
+}
+export const consoleLogWriter: ILogWriter = async entry => {
+  const method = severityToConsoleMethod[entry.severity]
+  const { className } = entry
+  const msg = `[${ entry.severity }]: ${ entry.timestamp } ${ className ? `${ className }:` : "" }( ${ entry.message } )`
+  if(entry.params){
+    // eslint-disable-next-line no-console
+    console[method](msg, entry.params)
+  }else{
+    // eslint-disable-next-line no-console
+    console[method](msg)
+  }
+}
+export const dockerLogWriter: ILogWriter = async entry => {
   // eslint-disable-next-line no-console
   console.log(JSON.stringify(entry))
 }
@@ -69,6 +91,8 @@ function replaceParams(obj: any, redactor: ILogRedactor): any{
   }
 }
 
+const contextLabels = new AsyncLocalStorage<ILogLabels>()
+
 export default class Logger{
   private readonly redactor: ILogRedactor
 
@@ -81,8 +105,10 @@ export default class Logger{
 protected async addLog(severity: Severity, msgOrErr: Error | string, structuredParams?: object){
   const message = msgOrErr instanceof Error ? msgOrErr.message : msgOrErr
   const params: any = msgOrErr instanceof Error ? structuredParams ?? msgOrErr : structuredParams
+  const ctxLabels = contextLabels.getStore()
   const json = {
     ...this.labels,
+    ...ctxLabels,
     message,
     params:    replaceParams(params, this.redactor),
     severity,
@@ -117,6 +143,16 @@ warn(message: string, structuredParams?: object){
 }
 
 /**
+ * This will create an async bound context to carry across any
+ * labels defined into all logs carried out inside this async execution
+ * @param labels The context labels
+ * @param fn The function to run within async context
+ */
+withContext<R>(labels: ILogLabels, fn: () => R): R{
+  return contextLabels.run(labels, () => fn())
+}
+
+/**
  * Creates a new logger merging the existing labels
  * with new labels. Use this for context bound loggers
  * @param labels
@@ -129,6 +165,7 @@ withLabels(labels: ILogLabels, ignoreCurrentLabels = false): Logger{
   }
   return new Logger({ ...this.labels, ...labels }, this.redactors, this.logWriter)
 }
+
 /**
  * Creates a new logger merging the existing redactors
  * with new redactors. Use this for context bound loggers

@@ -28,7 +28,7 @@ interface IInput<V> {
 }
 
 type IInputs<T> = {
-  [K in keyof T]: IInput<T[K]>
+  readonly [K in keyof T]: IInput<T[K]>
 }
 
 const isTemplateGenerator = (o: any): o is ITemplateGenerator => typeof o === "function"
@@ -124,7 +124,7 @@ async function readTemplate(config: IInitProjectConfig, filePath: string, outfil
   await fs.writeFile(outfile, data.trim(), { encoding: "utf-8" })
 }
 
-async function execProgram(currentDir: string, errMsg: string, cmd: string, ...cmdArgs: string[]){
+async function execProgram(currentDir: string, errMsg: string, cmd: string, ...cmdArgs: readonly string[]){
   return new Promise<number>((resolve, reject) => {
     const childProcess = spawn(cmd, cmdArgs, { cwd: currentDir, stdio: [ process.stdin, process.stdout, process.stderr ] })
     childProcess.once("exit", code => {
