@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { AsyncLocalStorage } from "async_hooks"
 
 export interface ILogLabels{
@@ -40,15 +41,15 @@ const severityToConsoleMethod: { readonly [P in Severity]: keyof Pick<Console, "
   [Severity.Error]:       "error",
   [Severity.Fatal]:       "error",
 }
-export const consoleLogWriter: ILogWriter = async entry => {
+export const consoleLogWriter = (logLabels = false): ILogWriter => async entry => {
   const method = severityToConsoleMethod[entry.severity]
   const { className } = entry
-  const msg = `[${ entry.severity }]: ${ entry.timestamp } ${ className ? `${ className }:` : "" }( ${ entry.message } )`
-  if(entry.params){
-    // eslint-disable-next-line no-console
+  const msg = `[${ entry.severity }] ${ entry.timestamp }${ className ? ` (${ className }):` : "" } ${ entry.message }`
+  if(logLabels){
+    console[method](msg, entry)
+  }else if(entry.params){
     console[method](msg, entry.params)
   }else{
-    // eslint-disable-next-line no-console
     console[method](msg)
   }
 }
@@ -98,7 +99,7 @@ export default class Logger{
 
   constructor(protected readonly labels: ILogLabels = {},
               protected readonly redactors: readonly ILogRedactor[] = [ defaultLogRedactor ],
-  protected readonly logWriter: ILogWriter = consoleLogWriter){
+  protected readonly logWriter: ILogWriter = consoleLogWriter()){
   this.redactor = composeRedactors(redactors)
 }
 
