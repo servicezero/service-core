@@ -178,6 +178,7 @@ module.exports = {
     "object-shorthand": "error",
     "prefer-const": ["error"],
     quotes: ["error", "double"],
+    "quote-props": ["error", "as-needed"],
     "require-atomic-updates": "off",
     semi: ["error", "never"],
     "sort-imports": ["error", {
@@ -188,6 +189,7 @@ module.exports = {
     }],
     "sort-keys-fix/sort-keys-fix": ["error", "asc", {"caseSensitive": true, "natural": true}],
     "space-before-blocks": ["error", "never"],
+    "space-infix-ops": "error",
     "template-curly-spacing": ["error", "always"],
     "functional/no-let": ["error", { "allowLocalMutation": true }],
     "functional/prefer-readonly-type": ["error", {"allowLocalMutation": true, "ignoreClass": true, "ignoreCollections": true}],

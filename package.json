@@ -20,6 +20,7 @@
     "test": "NODE_ENV=testing node --no-warnings --experimental-specifier-resolution=node --experimental-vm-modules --enable-source-maps node_modules/.bin/jest --collectCoverage",
     "test:watch": "npm run test -- --watchAll",
     "node:base": "node --no-warnings --experimental-specifier-resolution=node --experimental-vm-modules --enable-source-maps --harmony-top-level-await --experimental-loader ./build/runtime/module-loader.js",
+
     "build:cjs": "node pipeline/initialise.mjs && ttsc -p tsconfig.cjs.json",
     "build:esm": "ttsc -p tsconfig.json",
     "build:cjs:watch": "npm run build:cjs -- -w",
@@ -37,6 +38,7 @@
     "@types/mime-types": "^2.1.0",
     "@types/node": "^14.10.2",
     "@types/node-fetch": "^2.5.7",
+    "@types/swagger-ui-dist": "^3.30.0",
     "@typescript-eslint/eslint-plugin": "^4.1.1",
     "@typescript-eslint/parser": "^4.1.1",
     "abort-controller": "^3.0.0",
@@ -57,6 +59,7 @@
     "jest-junit": "^11.1.0",
     "mime-types": "^2.1.27",
     "node-fetch": "^2.6.1",
+    "swagger-ui-dist": "^3.36.2",
     "tslib": "^2.0.1",
     "ttypescript": "^2.5.2",
     "typescript": "^4.0.2"
@@ -66,7 +69,7 @@
       "./src/eslint-config/recommended.cjs"
     ],
     "parserOptions": {
-      "project": "tsconfig.json"
+      "project": ["tsconfig.json", "tsconfig.transformers.json"]
     }
   },
   "jest": {
