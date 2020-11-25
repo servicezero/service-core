@@ -70,7 +70,7 @@ function visitVariableStatement<T extends ts.VariableStatement>(context: ts.Tran
 }
 
 function visitExportDeclaration(context: ts.TransformationContext,
-                                exportDeclaration: ts.ExportDeclaration): IExportedNode<ts.ImportDeclaration>{
+  exportDeclaration: ts.ExportDeclaration): IExportedNode<ts.ImportDeclaration>{
   const { factory } = context
   const exportedNames: string[] = []
   let namespaceImport: ts.NamespaceImport
@@ -100,6 +100,12 @@ function visitExportDeclaration(context: ts.TransformationContext,
   }
 }
 
+function cleanModifiers(factory: ts.NodeFactory, expr: ts.Declaration){
+  const modifiers = ts.getCombinedModifierFlags(expr)
+  // remove export and default
+  return factory.createModifiersFromModifierFlags(modifiers ^ (ts.ModifierFlags.Default | ts.ModifierFlags.Export))
+}
+
 function visitDefaultExport(factory: ts.NodeFactory, defaultExport: ts.Node): IExportedNode<ts.VariableStatement>{
   const exportedNames: string[] = [ "default" ]
   let expr: ts.Expression
@@ -111,9 +117,9 @@ function visitDefaultExport(factory: ts.NodeFactory, defaultExport: ts.Node): IE
   }
 
   if(ts.isClassDeclaration(expr)){
-    expr = factory.createClassExpression(expr.decorators, undefined, expr.name, expr.typeParameters, expr.heritageClauses, expr.members)
+    expr = factory.createClassExpression(expr.decorators, cleanModifiers(factory, expr), expr.name, expr.typeParameters, expr.heritageClauses, expr.members)
   }else if(ts.isFunctionDeclaration(expr)){
-    expr = factory.createFunctionExpression(undefined, expr.asteriskToken, expr.name, expr.typeParameters, expr.parameters, expr.type, expr.body ?? factory.createBlock([]))
+    expr = factory.createFunctionExpression(cleanModifiers(factory, expr), expr.asteriskToken, expr.name, expr.typeParameters, expr.parameters, expr.type, expr.body ?? factory.createBlock([]))
   }
 
   const declarations = factory.createVariableDeclarationList(
@@ -284,18 +290,23 @@ export default function typescriptTransformerExportMock(): ts.CustomTransformers
               ]
             }else if(ts.isSourceFile(node)){
               // don't mock spec files
-              if(/\.(spec|int)\.[tj]sx?/.test(node.fileName) || node.fileName.includes("jest-setup")){
+              if(/\.(spec|int)\.[tj]sx?/.test(node.fileName)){
                 return node
               }
               // visit children
               const srcFile = ts.visitEachChild(node, visitor, context)
-              const statements = [
-                ...srcFile.statements,
-                // append mock helpers
-                ...createMockHelpers(node.fileName, exportedNames),
-              ]
-              return context.factory.updateSourceFile(srcFile, statements, srcFile.isDeclarationFile, srcFile.referencedFiles,
-                srcFile.typeReferenceDirectives, srcFile.hasNoDefaultLib, srcFile.libReferenceDirectives)
+              const hasExports = srcFile.statements.some(stmt => isNodeExported(ts.getOriginalNode(stmt)))
+              if(hasExports){
+                const statements = [
+                  ...srcFile.statements,
+                  // append mock helpers
+                  ...createMockHelpers(node.fileName, exportedNames),
+                ]
+                return context.factory.updateSourceFile(srcFile, statements, srcFile.isDeclarationFile, srcFile.referencedFiles,
+                  srcFile.typeReferenceDirectives, srcFile.hasNoDefaultLib, srcFile.libReferenceDirectives)
+              }else{
+                return srcFile
+              }
             }else{
               return node
             }

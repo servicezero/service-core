@@ -26,11 +26,11 @@ export class ApiConfig<T, R>{
     readonly message: ICtor<T>,
     readonly response: ICtor<R>,
     readonly allowedPermissions: readonly string[] = [],
-  readonly authenticated: boolean = false,
-  readonly enableWebsockets: boolean = true,
-  readonly method: IApiMethod = "GET",
-  readonly swaggerTag?: string,
-){}
+    readonly authenticated: boolean = false,
+    readonly enableWebsockets: boolean = true,
+    readonly method: IApiMethod = "GET",
+    readonly swaggerTag?: string,
+  ){}
 }
 
 export interface IApiHandler<T, R>{

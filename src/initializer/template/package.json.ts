@@ -23,13 +23,12 @@ export default function template({ name, repository }: IInitProjectConfig){
   },
   "author": "",
   "license": "UNLICENSED",
-  "devDependencies": {
-  },
+  "devDependencies": {},
   "//dependencies": {
     "${ packageName }": "${ packageVersion }"
   },
   "dependencies": {
-    "typescript": "^4.3.4"
+    "typescript": "^4.0.2"
   },
   "eslintConfig": {
     "extends": [

@@ -17,6 +17,9 @@ interface ISourceResult{
   readonly source: SharedArrayBuffer | Uint8Array | string
 }
 
+interface ITransformContext extends IResolveResult, IFormatResult{
+}
+
 interface IModulePaths{
   readonly moduleName: string
   readonly paths: readonly string[]
@@ -30,7 +33,7 @@ const packageJson = JSON.parse(fs.readFileSync(packageFilePath, "utf-8"))
 // map to absolute paths
 const modulePaths = Object.entries(packageJson.modulePaths ?? {}).map(([ moduleName, paths = [] ]): IModulePaths => {
   const mappedPaths = (paths as readonly string[])
-.map(p => path.resolve(projectDir, p))
+    .map(p => path.resolve(projectDir, p))
     .sort((p1, p2) => p2.length - p1.length)
 
   return {
@@ -99,4 +102,9 @@ export async function getFormat(url: string, context: {}, defaultGetFormat: (url
 export async function getSource(url: string, context: IFormatResult, defaultGetSource: (url: string, context: IFormatResult, def: any) => Promise<ISourceResult>): Promise<ISourceResult>{
   // Defer to Node.js for all other formats
   return defaultGetSource(url, context, defaultGetSource)
+}
+
+export async function transformSource(source: ISourceResult["source"], context: ITransformContext, defaultTransformSource: (source: ISourceResult["source"], context: ITransformContext, def: any) => Promise<ISourceResult>): Promise<ISourceResult>{
+  // Defer to Node.js for all other sources.
+  return defaultTransformSource(source, context, defaultTransformSource)
 }

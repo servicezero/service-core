@@ -100,18 +100,18 @@ async function captureConfig(): Promise<IInitProjectConfig>{
 async function getAllTemplateFiles(rootdir: string): Promise<readonly string[]>{
   const allFiles: string[] = []
 
-const recursive = async(file: string) => {
-  const stats = await fs.stat(file)
-  if(stats.isDirectory()){
-    const files = await fs.readdir(file)
-    await Promise.all(files.map(f => recursive(path.resolve(file, f))))
-  } else if(stats.isFile() && file.endsWith(".js")){
-    allFiles.push(file)
+  const recursive = async(file: string) => {
+    const stats = await fs.stat(file)
+    if(stats.isDirectory()){
+      const files = await fs.readdir(file)
+      await Promise.all(files.map(f => recursive(path.resolve(file, f))))
+    } else if(stats.isFile() && file.endsWith(".js")){
+      allFiles.push(file)
+    }
   }
-}
-await recursive(rootdir)
+  await recursive(rootdir)
 
-return allFiles
+  return allFiles
 }
 
 async function readTemplate(config: IInitProjectConfig, filePath: string, outfile: string){
@@ -138,7 +138,7 @@ async function execProgram(currentDir: string, errMsg: string, cmd: string, ...c
   })
 }
 
-export default async function initProject(){
+async function initProject(){
   // Capture configuration from user terminal input
   const config = await captureConfig()
   console.log("Generating project...")

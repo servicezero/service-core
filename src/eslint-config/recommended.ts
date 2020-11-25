@@ -1,3 +1,4 @@
+/* eslint-disable */
 
 module.exports = {
   // Specifies the ESLint parser
@@ -118,7 +119,7 @@ module.exports = {
         },
       },
     ],
-    "@typescript-eslint/naming-convention": ["error", {
+    "@typescript-eslint/naming-convention": ["off", {
       "custom": {
         "match": true,
         "regex": "^I[A-Z]",
@@ -126,7 +127,7 @@ module.exports = {
       "format": ["PascalCase"],
       "selector": "interface",
     }],
-    "@typescript-eslint/no-empty-interface": "warn",
+    "@typescript-eslint/no-empty-interface": "off",
     "@typescript-eslint/no-explicit-any": "off",
     // "typescript-sort-keys/interface": [
     //   "error",
@@ -191,7 +192,7 @@ module.exports = {
     "space-before-blocks": ["error", "never"],
     "space-infix-ops": "error",
     "template-curly-spacing": ["error", "always"],
-    "functional/no-let": ["error", { "allowLocalMutation": true }],
+    "functional/no-let": ["off", { "allowLocalMutation": true }],
     "functional/prefer-readonly-type": ["error", {"allowLocalMutation": true, "ignoreClass": true, "ignoreCollections": true}],
   },
   settings: {

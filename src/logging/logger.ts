@@ -99,85 +99,85 @@ export default class Logger{
 
   constructor(protected readonly labels: ILogLabels = {},
               protected readonly redactors: readonly ILogRedactor[] = [ defaultLogRedactor ],
-  protected readonly logWriter: ILogWriter = consoleLogWriter()){
-  this.redactor = composeRedactors(redactors)
-}
-
-protected async addLog(severity: Severity, msgOrErr: Error | string, structuredParams?: object){
-  const message = msgOrErr instanceof Error ? msgOrErr.message : msgOrErr
-  const params: any = msgOrErr instanceof Error ? structuredParams ?? msgOrErr : structuredParams
-  const ctxLabels = contextLabels.getStore()
-  const json = {
-    ...this.labels,
-    ...ctxLabels,
-    message,
-    params:    replaceParams(params, this.redactor),
-    severity,
-    timestamp: new Date().toISOString(),
+              protected readonly logWriter: ILogWriter = consoleLogWriter()){
+    this.redactor = composeRedactors(redactors)
   }
-  try{
-    await this.logWriter(json)
-  } catch(e){
-    // eslint-disable-next-line no-console
-    console.error("Failed to write log entry", e)
+
+  protected async addLog(severity: Severity, msgOrErr: Error | string, structuredParams?: object){
+    const message = msgOrErr instanceof Error ? msgOrErr.message : msgOrErr
+    const params: any = msgOrErr instanceof Error ? structuredParams ?? msgOrErr : structuredParams
+    const ctxLabels = contextLabels.getStore()
+    const json = {
+      ...this.labels,
+      ...ctxLabels,
+      message,
+      params:    replaceParams(params, this.redactor),
+      severity,
+      timestamp: new Date().toISOString(),
+    }
+    try{
+      await this.logWriter(json)
+    } catch(e){
+      // eslint-disable-next-line no-console
+      console.error("Failed to write log entry", e)
+    }
   }
-}
 
-debug(message: string, structuredParams?: object){
-  return this.addLog(Severity.Debug, message, structuredParams)
-}
-
-error(message: Error | string, structuredParams?: object){
-  return this.addLog(Severity.Error, message, structuredParams)
-}
-
-fatal(message: Error | string, structuredParams?: object){
-  return this.addLog(Severity.Fatal, message, structuredParams)
-}
-
-info(message: string, structuredParams?: object){
-  return this.addLog(Severity.Information, message, structuredParams)
-}
-
-warn(message: string, structuredParams?: object){
-  return this.addLog(Severity.Warning, message, structuredParams)
-}
-
-/**
- * This will create an async bound context to carry across any
- * labels defined into all logs carried out inside this async execution
- * @param labels The context labels
- * @param fn The function to run within async context
- */
-withContext<R>(labels: ILogLabels, fn: () => R): R{
-  return contextLabels.run(labels, () => fn())
-}
-
-/**
- * Creates a new logger merging the existing labels
- * with new labels. Use this for context bound loggers
- * @param labels
- * @param ignoreCurrentLabels Optional, if true then does not keep existing labels.
- * Defaults to false to keep existing labels
- */
-withLabels(labels: ILogLabels, ignoreCurrentLabels = false): Logger{
-  if(ignoreCurrentLabels){
-    return new Logger(labels, this.redactors, this.logWriter)
+  debug(message: string, structuredParams?: object){
+    return this.addLog(Severity.Debug, message, structuredParams)
   }
-  return new Logger({ ...this.labels, ...labels }, this.redactors, this.logWriter)
-}
 
-/**
- * Creates a new logger merging the existing redactors
- * with new redactors. Use this for context bound loggers
- * @param redactors
- * @param ignoreCurrentRedactors Optional, if true then does not keep existing redactors.
- * Defaults to false to keep existing redactors
- */
-withRedactors(redactors: readonly ILogRedactor[], ignoreCurrentRedactors = false): Logger{
-  if(ignoreCurrentRedactors){
-    return new Logger(this.labels, redactors, this.logWriter)
+  error(message: Error | string, structuredParams?: object){
+    return this.addLog(Severity.Error, message, structuredParams)
   }
-  return new Logger(this.labels, [ ...this.redactors, ...redactors ], this.logWriter)
-}
+
+  fatal(message: Error | string, structuredParams?: object){
+    return this.addLog(Severity.Fatal, message, structuredParams)
+  }
+
+  info(message: string, structuredParams?: object){
+    return this.addLog(Severity.Information, message, structuredParams)
+  }
+
+  warn(message: string, structuredParams?: object){
+    return this.addLog(Severity.Warning, message, structuredParams)
+  }
+
+  /**
+   * This will create an async bound context to carry across any
+   * labels defined into all logs carried out inside this async execution
+   * @param labels The context labels
+   * @param fn The function to run within async context
+   */
+  withContext<R>(labels: ILogLabels, fn: () => R): R{
+    return contextLabels.run(labels, () => fn())
+  }
+
+  /**
+   * Creates a new logger merging the existing labels
+   * with new labels. Use this for context bound loggers
+   * @param labels
+   * @param ignoreCurrentLabels Optional, if true then does not keep existing labels.
+   * Defaults to false to keep existing labels
+   */
+  withLabels(labels: ILogLabels, ignoreCurrentLabels = false): Logger{
+    if(ignoreCurrentLabels){
+      return new Logger(labels, this.redactors, this.logWriter)
+    }
+    return new Logger({ ...this.labels, ...labels }, this.redactors, this.logWriter)
+  }
+
+  /**
+   * Creates a new logger merging the existing redactors
+   * with new redactors. Use this for context bound loggers
+   * @param redactors
+   * @param ignoreCurrentRedactors Optional, if true then does not keep existing redactors.
+   * Defaults to false to keep existing redactors
+   */
+  withRedactors(redactors: readonly ILogRedactor[], ignoreCurrentRedactors = false): Logger{
+    if(ignoreCurrentRedactors){
+      return new Logger(this.labels, redactors, this.logWriter)
+    }
+    return new Logger(this.labels, [ ...this.redactors, ...redactors ], this.logWriter)
+  }
 }

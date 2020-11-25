@@ -3,7 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "module": "CommonJS",
-    "outDir": "build/.transformers",
+    "outDir": "build",
     "paths": {
       "@service-core/*": [
         "src/*"
@@ -11,8 +11,9 @@
     }
   },
   "include": [
+    "src/eslint-config",
     "src/typescript",
-    "src/global.d.ts",
+    "src/global.d.ts"
   ],
   "exclude": [
     "node_modules",

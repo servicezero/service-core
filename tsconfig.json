@@ -10,7 +10,7 @@
     },
     "plugins": [
       {
-        "transform": "./build/.transformers/typescript-transformer-export-mock.js",
+        "transform": "./build/typescript/typescript-transformer-export-mock.js"
       }
     ]
   },
@@ -23,6 +23,7 @@
     "node_modules",
     "build",
     "dist",
+    "src/eslint-config",
     "src/typescript"
   ]
 }
