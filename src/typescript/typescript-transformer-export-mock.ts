@@ -1,5 +1,16 @@
 import ts from "typescript"
 
+export interface IExportMockTransformerOptions{
+  readonly fileNameExcludeMatchers: readonly string[]
+}
+
+const defaultOptions: IExportMockTransformerOptions = {
+  fileNameExcludeMatchers: [
+    "\\.(spec|int)\\.[tj]sx?",
+    "mock",
+  ],
+}
+
 interface IExportedNode<T extends ts.Node>{
   readonly exportedNames: string[]
   readonly node: T
@@ -248,7 +259,9 @@ function createMockHelpers(fileName: string, exportNames: string[]){
  * global[__mock_global_prop].push(__mock_set__)
  * ```
  */
-export default function typescriptTransformerExportMock(): ts.CustomTransformers{
+export default function typescriptTransformerExportMock(options: Partial<IExportMockTransformerOptions>): ts.CustomTransformers{
+  const opts = { ...defaultOptions, ...options }
+
   return {
     after: [
       context => {
@@ -289,8 +302,8 @@ export default function typescriptTransformerExportMock(): ts.CustomTransformers
                 createExportedNames(factory, visitResult.exportedNames),
               ]
             }else if(ts.isSourceFile(node)){
-              // don't mock spec files
-              if(/\.(spec|int)\.[tj]sx?/.test(node.fileName)){
+              // don't mock ignored files
+              if(opts.fileNameExcludeMatchers.some(m => new RegExp(m, "i").test(node.fileName))){
                 return node
               }
               // visit children
