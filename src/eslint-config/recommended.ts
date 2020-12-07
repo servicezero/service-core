@@ -150,7 +150,7 @@ module.exports = {
     "@typescript-eslint/space-before-function-paren": ["error", "never"],
     "eol-last": ["error", "always"],
     eqeqeq: ["error", "always"],
-    "filenames/match-exported": 0,
+    "filenames/match-exported": [ 2, "kebab" ],
     "filenames/match-regex": [2, "^[a-z]+[a-z0-9-]+(\\.[a-zA-Z0-9]+)?(\\.(spec|int))?$", true],
     "filenames/no-index": "off",
     "indent": ["error", 2],

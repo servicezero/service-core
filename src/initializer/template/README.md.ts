@@ -1,3 +1,4 @@
+// eslint-disable-next-line filenames/match-exported
 import type { IInitProjectConfig } from "@service-core/initializer/init-project"
 
 export default function template({ displayName }: IInitProjectConfig){

@@ -8,6 +8,10 @@ import path from "path"
 import { fileURLToPath } from "url"
 import { spawn } from "child_process"
 
+type Mutable<T> = {
+  -readonly [P in keyof T]: T[P]
+}
+
 export interface IInitProjectConfig {
   readonly displayName: string
   readonly name: string

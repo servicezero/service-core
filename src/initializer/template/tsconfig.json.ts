@@ -1,3 +1,4 @@
+// eslint-disable-next-line filenames/match-exported
 import { packageName } from "@service-core/config"
 import type { IInitProjectConfig } from "@service-core/initializer/init-project"
 
