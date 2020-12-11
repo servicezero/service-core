@@ -13,7 +13,7 @@ const defaultOptions: IExportMockTransformerOptions = {
 
 interface IExportedNode<T extends ts.Node>{
   readonly exportedNames: string[]
-  readonly node: T
+  readonly node: readonly T[]
 }
 
 function isNodeExported(node: ts.Node): boolean{
@@ -49,7 +49,7 @@ function visitDeclaration<T extends ts.ClassDeclaration | ts.EnumDeclaration | t
   }
   return {
     exportedNames: [ declaration.name!.text ],
-    node,
+    node:          [ node ],
   }
 }
 
@@ -76,7 +76,7 @@ function visitVariableStatement<T extends ts.VariableStatement>(context: ts.Tran
 
   return {
     exportedNames,
-    node: ts.visitNode(variableStatement, visitor),
+    node: [ ts.visitNode(variableStatement, visitor) ],
   }
 }
 
@@ -107,7 +107,7 @@ function visitExportDeclaration(context: ts.TransformationContext,
 
   return {
     exportedNames,
-    node: ts.visitNode(exportDeclaration, visitor) as any,
+    node: [ ts.visitNode(exportDeclaration, visitor) ] as any,
   }
 }
 
@@ -120,6 +120,7 @@ function cleanModifiers(factory: ts.NodeFactory, expr: ts.Declaration){
 function visitDefaultExport(factory: ts.NodeFactory, defaultExport: ts.Node): IExportedNode<ts.VariableStatement>{
   const exportedNames: string[] = [ "default" ]
   let expr: ts.Expression
+  let name: ts.Identifier | undefined
 
   if(ts.isExportAssignment(defaultExport)){
     expr = defaultExport.expression
@@ -128,20 +129,22 @@ function visitDefaultExport(factory: ts.NodeFactory, defaultExport: ts.Node): IE
   }
 
   if(ts.isClassDeclaration(expr)){
+    name = expr.name
     expr = factory.createClassExpression(expr.decorators, cleanModifiers(factory, expr), expr.name, expr.typeParameters, expr.heritageClauses, expr.members)
   }else if(ts.isFunctionDeclaration(expr)){
+    name = expr.name
     expr = factory.createFunctionExpression(cleanModifiers(factory, expr), expr.asteriskToken, expr.name, expr.typeParameters, expr.parameters, expr.type, expr.body ?? factory.createBlock([]))
   }
 
   const declarations = factory.createVariableDeclarationList(
-    [ factory.createVariableDeclaration("default$1", undefined, undefined, expr) ],
+    [ factory.createVariableDeclaration("default$1", undefined, undefined, name ?? expr) ],
     ts.NodeFlags.Const,
   )
   const node = factory.createVariableStatement(undefined, declarations)
 
   return {
     exportedNames,
-    node,
+    node: (name ? [ expr, node ] : [ node ]) as any,
   }
 }
 
@@ -165,9 +168,10 @@ function createMockHelpers(fileName: string, exportNames: string[]){
     .join("\n")
   const caseLines = exportNames
     .map(n => {
+      const varName = n === "default" ? "default$default" : n
       return `
               case "${ n }":{
-                 ${ n } = value
+                 ${ varName } = value
                  break
               }
             `
@@ -178,15 +182,12 @@ function createMockHelpers(fileName: string, exportNames: string[]){
     const __mock_originals_map__ = {
       ${ mapLines }
     }
-
     export function __mock_reset__(prop){
       __mock_set__(prop, __mock_originals_map__[prop])
     }
-
     export function __mock_original__(prop){
       return __mock_originals_map__[prop]
     }
-
     export function __mock_set__(prop, value){
       switch(prop){
         ${ caseLines }
@@ -194,18 +195,21 @@ function createMockHelpers(fileName: string, exportNames: string[]){
     }
   `
   // convert into statements
-  const srcFile = ts.createSourceFile(fileName, src, ts.ScriptTarget.ESNext, false, ts.ScriptKind.JS)
+  const srcFile = ts.createSourceFile(fileName, src, ts.ScriptTarget.ESNext, true, ts.ScriptKind.JS)
   // Synthesize all nodes and remove their source positions
   const visitor = (node: any) => {
     node.pos = -1
     node.end = -1
     node.flags |= ts.NodeFlags.Synthesized
+    if(ts.isFunctionDeclaration(node)
+       || (ts.isVariableStatement(node) && ts.isIdentifier(node.declarationList.declarations[0].name) && node.declarationList.declarations[0].name.text === "__mock_originals_map__")){
+      ts.addSyntheticLeadingComment(node, ts.SyntaxKind.MultiLineCommentTrivia, " istanbul ignore next ", true)
+    }
     node.forEachChild(visitor)
   }
   visitor(srcFile)
   return srcFile.statements
 }
-
 
 /**
  * This converts a module into a mockable module.
@@ -262,6 +266,11 @@ function createMockHelpers(fileName: string, exportNames: string[]){
 export default function typescriptTransformerExportMock(options: Partial<IExportMockTransformerOptions>): ts.CustomTransformers{
   const opts = { ...defaultOptions, ...options }
 
+  // Do nothing if release build
+  if(process.env.hasOwnProperty("RELEASE_BUILD")){
+    return {}
+  }
+
   return {
     after: [
       context => {
@@ -276,7 +285,7 @@ export default function typescriptTransformerExportMock(options: Partial<IExport
                 factory.createIdentifier(getExportVarName(visitResult.exportedNames[0])))
               exportedNames = exportedNames.concat(visitResult.exportedNames)
               return [
-                visitResult.node,
+                ...visitResult.node,
                 createExportedNames(factory, visitResult.exportedNames),
                 defaultAssignment,
               ]
@@ -284,21 +293,21 @@ export default function typescriptTransformerExportMock(options: Partial<IExport
               const visitResult = visitVariableStatement(context, node)
               exportedNames = exportedNames.concat(visitResult.exportedNames)
               return [
-                visitResult.node,
+                ...visitResult.node,
                 createExportedNames(factory, visitResult.exportedNames),
               ]
             }else if(isNodeExported(node) && isExportedDeclaration(node)){
               const visitResult = visitDeclaration(factory, node)
               exportedNames = exportedNames.concat(visitResult.exportedNames)
               return [
-                visitResult.node,
+                ...visitResult.node,
                 createExportedNames(factory, visitResult.exportedNames),
               ]
             }else if(ts.isExportDeclaration(node)){
               const visitResult = visitExportDeclaration(context, node)
               exportedNames = exportedNames.concat(visitResult.exportedNames)
               return [
-                visitResult.node,
+                ...visitResult.node,
                 createExportedNames(factory, visitResult.exportedNames),
               ]
             }else if(ts.isSourceFile(node)){

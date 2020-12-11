@@ -30,6 +30,16 @@
     "strictNullChecks": true,
     "stripInternal": true,
     "target": "ES2020",
+    "plugins": [
+      {
+        "type": "config",
+        "transform": "@service-core/typescript/typescript-transformer-export-mock"
+      },
+      {
+        "type": "checker",
+        "transform": "@service-core/typescript/typescript-transformer-type-specification"
+      }
+    ]
   },
   "exclude": [
     "build",

@@ -10,7 +10,12 @@
     },
     "plugins": [
       {
+        "type": "config",
         "transform": "./build/typescript/typescript-transformer-export-mock.js"
+      },
+      {
+        "type": "checker",
+        "transform": "./build/typescript/typescript-transformer-type-specification.js"
       }
     ]
   },

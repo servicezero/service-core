@@ -83,6 +83,10 @@ function findModule(specifier: string){
 }
 
 export async function resolve(specifier: string, context: IResolveContext, defaultResolve: (specifier: string, context: IResolveContext, def: any) => Promise<IResolveResult>): Promise<IResolveResult>{
+  // If file does not exist it might be a module references
+  if(specifier.startsWith(`file://${ projectDir }/`) && !fs.existsSync(specifier.replace("file://", ""))){
+    specifier = specifier.replace(`file://${ projectDir }/`, "")
+  }
   // do we have a module path match for specifier
   const matched = findModule(specifier)
   if(matched){

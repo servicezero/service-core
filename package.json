@@ -20,7 +20,6 @@
     "test": "NODE_ENV=testing node --no-warnings --experimental-specifier-resolution=node --experimental-vm-modules --enable-source-maps node_modules/.bin/jest --collectCoverage",
     "test:watch": "npm run test -- --watchAll",
     "node:base": "node --no-warnings --experimental-specifier-resolution=node --experimental-vm-modules --enable-source-maps --harmony-top-level-await --experimental-loader ./build/runtime/module-loader.js",
-
     "build:cjs": "node pipeline/initialise.mjs && ttsc -p tsconfig.cjs.json",
     "build:esm": "ttsc -p tsconfig.json",
     "build:cjs:watch": "npm run build:cjs -- -w",
