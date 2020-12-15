@@ -1,5 +1,6 @@
 import {
   deserializeTypeFromJson,
+  getInheritanceClassNameFromType,
   serializeTypeToJson,
 } from "./type-serializer"
 import {
@@ -11,9 +12,10 @@ enum EnumA{
   Two = 1,
 }
 enum EnumB{
-  One = "One 1",
-  Two = "Two 2",
-  None = "None",
+  One = "Two",
+  Two = "One",
+  Three = "3",
+  None = "NoneVal",
 }
 
 class SmallModel{
@@ -312,6 +314,30 @@ it("throws when cannot find type definition", () => {
   }).toThrow()
 })
 
+it("getInheritanceClassNameFromType", () => {
+  expect(getInheritanceClassNameFromType("Some.Domain.Models.UnionClassA, Some.Domain.Models"))
+    .toEqual({
+      className:       "Some.Domain.Models.UnionClassA",
+      classNameSimple: "UnionClassA",
+      packageName:     "Some.Domain.Models",
+      type:            "Some.Domain.Models.UnionClassA, Some.Domain.Models",
+    })
+  expect(getInheritanceClassNameFromType("UnionClassA, Models"))
+    .toEqual({
+      className:       "UnionClassA",
+      classNameSimple: "UnionClassA",
+      packageName:     "Models",
+      type:            "UnionClassA, Models",
+    })
+  expect(getInheritanceClassNameFromType("UnionClassA"))
+    .toEqual({
+      className:       "UnionClassA",
+      classNameSimple: "UnionClassA",
+      packageName:     "",
+      type:            "UnionClassA",
+    })
+})
+
 it("deserializes union types when c# defined class and package", () => {
   const deserialized = deserializeTypeFromJson(UnionClasses, JSON.stringify({
     uni: {
@@ -389,7 +415,7 @@ it("serializes / deserializes when complex paths and values", () => {
 
   const val = new ComplexProps("v1", map, map, arr, arr)
   const serialized = serializeTypeToJson(ComplexProps, val)
-  expect(deserializeTypeFromJson(ComplexProps, JSON.stringify(serialized))).toEqual(val)
+  expect(deserializeTypeFromJson(ComplexProps, JSON.parse(JSON.stringify(serialized)))).toEqual(val)
 })
 
 const date1Ts = "2020-01-02T03:04:05.789Z"
@@ -415,7 +441,7 @@ const serializeData = {
   "cls.str":           [ "class string field", "s1", "s1", 12, "12", undefined, "" ],
   date:                [ "date", date1, expDate, date1.getTime(), expDate, date1Ts, expDate, 12n, zeroDate, "er", zeroDate, undefined, zeroDate ],
   enumNum:             [ "number enum", EnumA.One, "One", EnumA.Two, "Two", "unknown", "One", undefined, "One" ],
-  enumStr:             [ "string enum", EnumB.One, "One", EnumB.Two, "Two", "unknown", "None", undefined, "None" ],
+  enumStr:             [ "string enum", EnumB.One, EnumB.One, EnumB.Two, EnumB.Two, "unknown", EnumB.None, undefined, EnumB.None ],
   intLit:              [ "number literal", 1, "1", 2, "2", "unknown", "0", undefined, "0" ],
   mapFloat:            [ "Map<float, int>", new Map<any, any>([ [ "12.34", "13.56" ], [ 13.11, 15.67 ], [ undefined, "d" ], [ -11.6, -34.23 ] ]), { "-11.6": -34, 0: 0, 12.34: 13, 13.11: 15 }, [], {} ],
   "mapFloat['12.34']": [ "map int value", "c", 0, "12.34", 12 ],
@@ -470,7 +496,7 @@ const deserializeData = {
   "cls.str":           [ "class string field", "s1", "s1", 12, "12", null, "" ],
   date:                [ "date", expDate, date1, date1.getTime(), date1, date1Ts, date1, "er", date0, null, date0 ],
   enumNum:             [ "number enum", "One", EnumA.One, "Two", EnumA.Two, "twO", EnumA.Two, "unknown", EnumA.One, null, EnumA.One ],
-  enumStr:             [ "string enum", "One", EnumB.One, "Two", EnumB.Two, "twO", EnumB.Two, "unknown", EnumB.None, "None", EnumB.None ],
+  enumStr:             [ "string enum", "3", EnumB.Three, "Three", EnumB.Three, "One", EnumB.Two, "Two", EnumB.One, "twO", EnumB.One, "thREe", EnumB.Three, "unknown", EnumB.None, "None", EnumB.None ],
   intLit:              [ "number literal", 1, 1, "1", 1, "2", 2, "unknown", 0, null, 0 ],
   mapFloat:            [ "Map<float, int>", { "-11.6": -34.12, 12.34: "13" }, new Map<any, any>([ [ -11.6, -34 ], [ 12.34, 13 ] ]), {}, new Map() ],
   "mapFloat['12.34']": [ "map int value", "c", 0, "12.34", 12, 14, 14 ],

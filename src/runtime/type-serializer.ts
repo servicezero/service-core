@@ -1,5 +1,5 @@
 import {
-  ICtorSchema,
+  ICtor,
   ITypeDef,
   ITypeDefEnum,
   ITypeDefEnumLiteral,
@@ -43,9 +43,20 @@ function findEnumValue(value: any, typeDef: ITypeDefEnum | ITypeDefEnumLiteral):
     return byKey
   }
   // possible casing issue ?
-  // compare by lowercase only keys
   if(typeof value === "string"){
     const lv = value.toLowerCase()
+
+    // compare by lowercase values first
+    for(const v of typeDef.vals.keys()){
+      // numeric enums no need to check values
+      if(typeof v !== "string"){
+        break
+      }
+      if(v.toLowerCase() === lv){
+        return v
+      }
+    }
+    // compare by lowercase keys last
     for(const k of typeDef.keys.keys()){
       if(k.toLowerCase() === lv){
         return typeDef.keys.get(k)
@@ -58,11 +69,24 @@ function findEnumValue(value: any, typeDef: ITypeDefEnum | ITypeDefEnumLiteral):
 
 function findEnumKey(value: any, typeDef: ITypeDefEnum | ITypeDefEnumLiteral): string | undefined{
   // first look for value type
-  return typeDef.vals.get(value) ??
-         // otherwise default to value if required
-         (typeDef.required ? typeDef.vals.get(typeDef.unmatchedValue as any) : undefined)
+  const key = typeDef.vals.get(value)
+  if(key !== undefined){
+    // with string valued enums always serialize the value
+    return typeof value === "string" ? value : key
+  }
+  // otherwise default to value if required
+  if(typeDef.required){
+    return typeof typeDef.unmatchedValue === "string" ? typeDef.unmatchedValue : typeDef.vals.get(typeDef.unmatchedValue as any)
+  }
+  return undefined
 }
 
+export interface ICSharpClassRef{
+  readonly className: string
+  readonly classNameSimple: string
+  readonly packageName: string
+  readonly type: string
+}
 /**
  * c# produces serialization property for inherited types
  * as { $type: "{ Absolute Class Name }, { Absolute Package Name }" }
@@ -70,10 +94,16 @@ function findEnumKey(value: any, typeDef: ITypeDefEnum | ITypeDefEnumLiteral): s
  * This method will extract the class name
  * @param type
  */
-function getInheritanceClassNameFromType(type: string): string | undefined{
-  const [ clsName = "" ] = type.split(/,\s*/gi)
-  const idx = clsName.lastIndexOf(".")
-  return idx > 0 ? clsName.substring(idx + 1) : undefined
+export function getInheritanceClassNameFromType(type: string): ICSharpClassRef{
+  const [ className = "", packageName = "" ] = type.split(/,\s*/gi)
+  const idx = className.lastIndexOf(".")
+  const classNameSimple = idx > 0 ? className.substring(idx + 1) : className
+  return {
+    className,
+    classNameSimple,
+    packageName,
+    type,
+  }
 }
 
 function deserializeTypeDefFromJson(typeDef: ITypeDef, value: any): any{
@@ -153,7 +183,7 @@ function deserializeTypeDefFromJson(typeDef: ITypeDef, value: any): any{
     if(value?._typ){
       typName = value?._typ
     } else if(value?.$type){ // c# style deserialization
-      typName = getInheritanceClassNameFromType(value.$type)
+      typName = getInheritanceClassNameFromType(value.$type)?.classNameSimple
     } else {
       typName = getTypOfValue(value, typeDef.values[Typ.Int]?.type ?? typeDef.values[Typ.Float]?.type)
     }
@@ -273,8 +303,8 @@ function serializeTypeDefToJson(typeDef: ITypeDef, value: any): any{
  * array indexes, map keys, supports deeply nested paths.
  * @throws SerializationException if type definition could not be found at path
  */
-export function findDef<T>(schema: ICtorSchema<T>, path = ""){
-  const typeDef = getOrCreateClassDef(schema)
+export function findDef<T>(schema: ICtor<T>, path = ""){
+  const typeDef = getOrCreateClassDef(schema as any)
   // find type definition at path
   const foundDef = getTypeDefForPath(typeDef, path)
   if(!foundDef){
@@ -287,14 +317,15 @@ export function findDef<T>(schema: ICtorSchema<T>, path = ""){
  * Deserializes the given json string into restricted type ensuring
  * value types, properties etc to guarantee the schema is met.
  * @param schema The type to deserialize into
- * @param json The json formatted string to deserialize
+ * @param json The json formatted string or object to deserialize. If an object
+ * is defined it is expected to be a mutable object for performance.
  * @param path The root or sub path of the field we want to deserialize
  * @return Restricted json object with only supported values of the schema
  * @throws SerializationException if type definition could not be found at path
  */
-export function deserializeTypeFromJson<T>(schema: ICtorSchema<T>, json: string, path = ""): any{
+export function deserializeTypeFromJson<T>(schema: ICtor<T>, json: object | string, path = ""): any{
   const foundDef = findDef(schema, path)
-  return deserializeTypeDefFromJson(foundDef, JSON.parse(json))
+  return deserializeTypeDefFromJson(foundDef, typeof json === "string" ? JSON.parse(json) : json)
 }
 
 /**
@@ -306,7 +337,7 @@ export function deserializeTypeFromJson<T>(schema: ICtorSchema<T>, json: string,
  * @return Restricted json object with only supported values of the schema
  * @throws SerializationException if type definition could not be found at path
  */
-export function serializeTypeToJson<T extends object>(schema: ICtorSchema<T>, value: any, path = ""): any{
+export function serializeTypeToJson<T extends object>(schema: ICtor<T>, value: any, path = ""): any{
   const foundDef = findDef(schema, path)
   return serializeTypeDefToJson(foundDef, value)
 }

@@ -103,6 +103,12 @@ export interface ICtorSchema<T>{
   new (...args: any[]): T
 }
 
+declare global{
+  interface Function{
+    readonly class?: IClassSpec<unknown>
+  }
+}
+
 type IUnionTypeSpec<T extends any[], B extends any[] = []> =
   T extends [infer U, ...unknown[]] ? IUnionTypeSpec<ITail<T>, [...B, ITypeSpec<U>]> : B
 

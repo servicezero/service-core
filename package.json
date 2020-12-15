@@ -68,7 +68,10 @@
       "./src/eslint-config/recommended.cjs"
     ],
     "parserOptions": {
-      "project": ["tsconfig.json", "tsconfig.transformers.json"]
+      "project": [
+        "tsconfig.json",
+        "tsconfig.cjs.json"
+      ]
     }
   },
   "jest": {

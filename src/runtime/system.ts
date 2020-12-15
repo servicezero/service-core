@@ -76,9 +76,11 @@ export class System extends SystemContainer{
       this.instances.set(config.constructor as any, config as any)
     }
     // Instantiate all services
-    const instances = Array.from(services!.keys()).map(c => this.getInstance(c))
+    for(const c of services.keys()){
+      this.getInstance(c)
+    }
     // Startup services
-    const startableServices = instances.filter(hasStartup)
+    const startableServices = Array.from(this.instances.values()).filter(hasStartup)
     for(const service of startableServices){
       try{
         await this.startupService(service)

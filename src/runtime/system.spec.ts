@@ -34,6 +34,15 @@ class ServiceC{
   startup = startupMock
 }
 
+class ServiceD{
+  shutdown = shutdownMock
+  startup = startupMock
+}
+
+class ServiceE{
+  static inject = [ ServiceD ]
+}
+
 
 const registry = new SystemRegistry()
   .withConfig(new ConfigA())
@@ -55,16 +64,17 @@ describe("system", () => {
   })
 
   it("startup all services in registry", async() => {
+    const sys = new System(logMock as any, registry.withService(ServiceE), procMock as any)
     await sys.startup()
 
-    const serviceA = sys.findInstance(ServiceA)
-    expect(serviceA).toBeInstanceOf(ServiceA)
-    expect(serviceA?.startup).toHaveBeenCalledTimes(2)
-    expect(serviceA?.shutdown).toHaveBeenCalledTimes(0)
+    expect(sys.findInstance(ServiceA)).toBeInstanceOf(ServiceA)
+    expect(sys.findInstance(ServiceB)).toBeInstanceOf(ServiceB)
+    expect(sys.findInstance(ServiceC)).toBeInstanceOf(ServiceC)
+    expect(sys.findInstance(ServiceD)).toBeInstanceOf(ServiceD)
+    expect(sys.findInstance(ServiceE)).toBeInstanceOf(ServiceE)
 
-    const serviceB = sys.findInstance(ServiceB)
-    expect(serviceB).toBeInstanceOf(ServiceB)
-    expect(serviceB?.shutdown).toHaveBeenCalledTimes(0)
+    expect(startupMock).toHaveBeenCalledTimes(3)
+    expect(shutdownMock).toHaveBeenCalledTimes(0)
   })
 
   it("startup does nothing when already running", async() => {
