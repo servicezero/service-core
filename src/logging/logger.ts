@@ -2,7 +2,7 @@
 import { AsyncLocalStorage } from "async_hooks"
 
 export interface ILogLabels{
-  readonly [key: string]: string
+  readonly [key: string]: boolean | number | string | undefined
 }
 export interface ILogEntry{
   readonly message: string
@@ -25,6 +25,7 @@ export interface ILogWriter{
 }
 
 export enum Severity{
+  None = "None",
   Debug = "Debug",
   Error = "Error",
   Fatal = "Fatal",
@@ -32,9 +33,19 @@ export enum Severity{
   Warning = "Warning",
 }
 
+const severityLevels: { readonly [P in Severity]: number } = {
+  [Severity.None]:        0,
+  [Severity.Fatal]:       1,
+  [Severity.Error]:       2,
+  [Severity.Warning]:     3,
+  [Severity.Information]: 4,
+  [Severity.Debug]:       5,
+}
+
 const defaultLogRedactor: ILogRedactor = property => /^(pass|passwords?|phones?|mobiles?|emails?|address)$/i.test(property)
 
 const severityToConsoleMethod: { readonly [P in Severity]: keyof Pick<Console, "debug" | "error" | "info" | "warn"> } = {
+  [Severity.None]:        "debug",
   [Severity.Debug]:       "debug",
   [Severity.Information]: "info",
   [Severity.Warning]:     "warn",
@@ -99,11 +110,17 @@ export default class Logger{
 
   constructor(protected readonly labels: ILogLabels = {},
               protected readonly redactors: readonly ILogRedactor[] = [ defaultLogRedactor ],
-              protected readonly logWriter: ILogWriter = consoleLogWriter()){
+              protected readonly logWriter: ILogWriter = consoleLogWriter(),
+              readonly severityLevel: Severity = Severity.Information){
     this.redactor = composeRedactors(redactors)
   }
 
   protected async addLog(severity: Severity, msgOrErr: Error | string, structuredParams?: object){
+    // check if within severity level
+    if(severityLevels[severity] > severityLevels[this.severityLevel]){
+      return
+    }
+
     const message = msgOrErr instanceof Error ? msgOrErr.message : msgOrErr
     const params: any = msgOrErr instanceof Error ? structuredParams ?? msgOrErr : structuredParams
     const ctxLabels = contextLabels.getStore()
@@ -139,6 +156,10 @@ export default class Logger{
     return this.addLog(Severity.Information, message, structuredParams)
   }
 
+  log(severity: Severity, message: string, structuredParams?: object){
+    return this.addLog(severity, message, structuredParams)
+  }
+
   warn(message: string, structuredParams?: object){
     return this.addLog(Severity.Warning, message, structuredParams)
   }
@@ -162,9 +183,9 @@ export default class Logger{
    */
   withLabels(labels: ILogLabels, ignoreCurrentLabels = false): Logger{
     if(ignoreCurrentLabels){
-      return new Logger(labels, this.redactors, this.logWriter)
+      return new Logger(labels, this.redactors, this.logWriter, this.severityLevel)
     }
-    return new Logger({ ...this.labels, ...labels }, this.redactors, this.logWriter)
+    return new Logger({ ...this.labels, ...labels }, this.redactors, this.logWriter, this.severityLevel)
   }
 
   /**
@@ -176,8 +197,17 @@ export default class Logger{
    */
   withRedactors(redactors: readonly ILogRedactor[], ignoreCurrentRedactors = false): Logger{
     if(ignoreCurrentRedactors){
-      return new Logger(this.labels, redactors, this.logWriter)
+      return new Logger(this.labels, redactors, this.logWriter, this.severityLevel)
     }
-    return new Logger(this.labels, [ ...this.redactors, ...redactors ], this.logWriter)
+    return new Logger(this.labels, [ ...this.redactors, ...redactors ], this.logWriter, this.severityLevel)
+  }
+
+  /**
+   * Creates a new logger replacing the severity level. Use this for
+   * customising the severity level of logs
+   * @param severityLevel The severity level to use
+   */
+  withSeverityLevel(severityLevel: Severity): Logger{
+    return new Logger(this.labels, this.redactors, this.logWriter, severityLevel)
   }
 }

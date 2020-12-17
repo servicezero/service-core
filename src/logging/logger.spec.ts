@@ -7,11 +7,13 @@ type ILogMethods = keyof Pick<Logger, "debug" | "error" | "fatal" | "info" | "wa
 const timestampMatcher = expect.stringMatching(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/)
 
 describe("Logger", () => {
-  const logger = new Logger({ a: "A", "test.b": "B" }, undefined, mockLogWriter)
+  const logger = new Logger({ a: "A", "test.b": "B" }, undefined, mockLogWriter, Severity.Debug)
 
-  async function verifyLog(method: ILogMethods, severity: Severity){
-    await logger[method]("Test msg", { email: "foo@bar.com", foo: "bar" })
-    expect(mockLogWriter).toHaveBeenCalledTimes(1)
+  async function verifyLog(method: ILogMethods, severity: Severity, log: Logger = logger){
+    mockLogWriter.mockReset()
+    await log[method]("Test msg", { email: "foo@bar.com", foo: "bar" })
+    await log.log(severity, "Test msg", { email: "foo@bar.com", foo: "bar" })
+    expect(mockLogWriter).toHaveBeenCalledTimes(2)
     expect(mockLogWriter).toHaveBeenCalledWith({
       a:       "A",
       message: "Test msg",
@@ -25,11 +27,25 @@ describe("Logger", () => {
     })
   }
 
+  async function verifyNoLog(method: ILogMethods, log: Logger = logger){
+    mockLogWriter.mockReset()
+    await log[method]("Test msg", { email: "foo@bar.com", foo: "bar" })
+    expect(mockLogWriter).toHaveBeenCalledTimes(0)
+  }
+
   it("logs debug messages", async() => await verifyLog("debug", Severity.Debug))
   it("logs info messages", async() => await verifyLog("info", Severity.Information))
   it("logs error messages", async() => await verifyLog("error", Severity.Error))
   it("logs warn messages", async() => await verifyLog("warn", Severity.Warning))
   it("logs fatal messages", async() => await verifyLog("fatal", Severity.Fatal))
+  it("does not log when lower than severity level", async() => {
+    const log = logger.withSeverityLevel(Severity.Warning)
+    await verifyLog("warn", Severity.Warning, log)
+    await verifyLog("error", Severity.Error, log)
+    await verifyLog("fatal", Severity.Fatal, log)
+    await verifyNoLog("debug", log)
+    await verifyNoLog("info", log)
+  })
 
   it("logs error object as message", async() => {
     await logger
