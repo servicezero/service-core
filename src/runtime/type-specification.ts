@@ -58,6 +58,7 @@ export type ITail<T extends any[]> = T extends [any, ...infer R] ? R : never
 //   ? IPromiseTuple<ITail<A>, [...B, INullablePromise<U>]>
 //   : B
 
+export const TypeSpecificationException = createException("TypeSpecificationException")
 
 export enum Typ{
   Arr = "Arr",
@@ -469,6 +470,10 @@ export function getObjPath(currentPath: string, propertyName: string){
  * @param schema The class constructor to create type definition for
  */
 export function getOrCreateClassDef<T>(schema: ICtorSchema<T>): ITypeDefClass<T>{
+  if(!isCtorSchema(schema)){
+    throw new TypeSpecificationException(`Cannot create class definition for schema '${ (schema as any)?.name }', static property class is not defined`)
+  }
+
   if(rootTypeRegistry.has(schema)){
     return rootTypeRegistry.get(schema) as any
   }

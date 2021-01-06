@@ -1,6 +1,7 @@
 import { System } from "@service-core/runtime/system"
 import { SystemRegistry } from "@service-core/runtime/system-registry"
 import * as runtimeProcess from "@service-core/runtime/process"
+import type { IClassSpec } from "@service-core/runtime/type-specification"
 import { mockExport } from "@service-core/testing/export-mocks"
 
 const gracefulShutdownMock = mockExport(runtimeProcess, "gracefulShutdown", jest.fn())
@@ -13,12 +14,29 @@ const logMock = {
 }
 const procMock = {
   __proc: "a",
+  env:    {},
 }
 const startupMock = jest.fn()
 const shutdownMock = jest.fn()
 
-class ConfigA{}
-class ConfigB{}
+class ConfigA{
+  static readonly class: IClassSpec<ConfigA>
+  static readonly envConfigPrefix = "ConfigA"
+
+  constructor(
+    readonly foo: string = "def1",
+    readonly bar: boolean = false,
+  ){}
+}
+class ConfigB{
+  static readonly class: IClassSpec<ConfigB>
+  static readonly envConfigPrefix = "ConfigB"
+
+  constructor(
+    readonly count: number = 4,
+    readonly items?: string[],
+  ){}
+}
 
 class ServiceA{
   shutdown = shutdownMock
@@ -45,17 +63,28 @@ class ServiceE{
 
 
 const registry = new SystemRegistry()
-  .withConfig(new ConfigA())
-  .withConfig(new ConfigB())
+  .withConfig(ConfigA)
+  .withConfig(ConfigB)
   .withService(ServiceA)
   .withService(ServiceB)
   .withService(ServiceC)
 
+const registryEnvConfigs = registry
+  .withEnvConfig("default", {
+    "ConfigA.foo":   "v1",
+    "ConfigB.items": [ "a", "b" ],
+  })
+  .withEnvConfig("dev", {
+    "ConfigA.foo":   "v2",
+    "ConfigB.items": [ "c" ],
+  })
+
 describe("system", () => {
-  let sys: System
+  let sys: System<any>
 
   beforeEach(() => {
-    sys = new System(logMock as any, registry, procMock as any)
+    procMock.env = {}
+    sys = new System(logMock as any, registry, "dev", procMock as any)
   })
 
   it("registers graceful shutdown", () => {
@@ -64,7 +93,7 @@ describe("system", () => {
   })
 
   it("startup all services in registry", async() => {
-    const sys = new System(logMock as any, registry.withService(ServiceE), procMock as any)
+    const sys = new System(logMock as any, registry.withService(ServiceE), "dev", procMock as any)
     await sys.startup()
 
     expect(sys.findInstance(ServiceA)).toBeInstanceOf(ServiceA)
@@ -75,6 +104,57 @@ describe("system", () => {
 
     expect(startupMock).toHaveBeenCalledTimes(3)
     expect(shutdownMock).toHaveBeenCalledTimes(0)
+  })
+
+  it("startup creates env config with defaults", async() => {
+    const sys = new System(logMock as any, registry, "dev", procMock as any)
+    await sys.startup()
+
+    const configA = sys.findInstance(ConfigA)
+    const configB = sys.findInstance(ConfigB)
+
+    expect(configA).toEqual(new ConfigA())
+    expect(configB).toEqual(new ConfigB())
+  })
+
+  it("startup creates env config with config properties for si", async() => {
+    const sys = new System(logMock as any, registryEnvConfigs, "si", procMock as any)
+    await sys.startup()
+
+    const configA = sys.findInstance(ConfigA)
+    const configB = sys.findInstance(ConfigB)
+
+    expect(configA).toEqual(new ConfigA("v1"))
+    expect(configB).toEqual(new ConfigB(4, [ "a", "b" ]))
+  })
+
+  it("startup creates env config with config properties for dev", async() => {
+    const sys = new System(logMock as any, registryEnvConfigs, "dev", procMock as any)
+    await sys.startup()
+
+    const configA = sys.findInstance(ConfigA)
+    const configB = sys.findInstance(ConfigB)
+
+    expect(configA).toEqual(new ConfigA("v2"))
+    expect(configB).toEqual(new ConfigB(4, [ "c" ]))
+  })
+
+  it("startup creates env config with config properties for dev and env vars", async() => {
+    procMock.env = {
+      "CONFIGA.BaR":   "1",
+      "CONFIGB.count": "12",
+      "CoNFiga.FoO":   "v4",
+      NODE_ENV:        "bla",
+      SOME:            "ergre",
+    }
+    const sys = new System(logMock as any, registryEnvConfigs, "dev", procMock as any)
+    await sys.startup()
+
+    const configA = sys.findInstance(ConfigA)
+    const configB = sys.findInstance(ConfigB)
+
+    expect(configA).toEqual(new ConfigA("v4", true))
+    expect(configB).toEqual(new ConfigB(12, [ "c" ]))
   })
 
   it("startup does nothing when already running", async() => {

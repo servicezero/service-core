@@ -2,8 +2,17 @@ import Logger from "@service-core/logging/logger"
 import { asyncTimeout } from "@service-core/runtime/async"
 import { createException } from "@service-core/runtime/exceptions"
 
-interface ICtor<T>{
+export interface ICtor<T>{
   new (...args: any[]): T
+}
+
+export interface IConfigCtor<T, K extends string>{
+  readonly envConfigPrefix: string extends K ? never : K
+  new (...args: any[]): T
+}
+
+export function isConfigCtor(o: any): o is IConfigCtor<any, any>{
+  return o !== null && o !== undefined && typeof o.envConfigPrefix === "string"
 }
 
 export interface ISystemServiceShutdown{
@@ -28,6 +37,8 @@ export interface ISystemServiceStartup{
 export interface ISystemService extends Partial<ISystemServiceShutdown>, Partial<ISystemServiceStartup>{
 }
 
+export type IEnvMode = "default" | "dev" | "pr" | "pt" | "qa" | "sbx" | "si" | "test"
+
 interface ISystemServiceClass<T extends ISystemService>{
   /**
    * Dependency injectors
@@ -46,39 +57,74 @@ export function hasStartup(o: any): o is ISystemServiceStartup{
 
 export const CyclicDependenciesException = createException("CyclicDependenciesException")
 
-export class SystemRegistry{
+type IMergeEnvConfig<A, B, K extends string> = Omit<A, K> & Record<K, B>
+type IMergeEnvConfigs<A, B> = B & Omit<A, keyof B>
+type IEnvConfigOpt<T, Prefix extends string> = {
+  readonly [K in keyof T as `${ Prefix }.${ K & string }`]?: T[K]
+}
+type IEnvConfigKeys<T> = {
+  readonly [P in keyof T]: IEnvConfigOpt<T[P], P & string>
+}
+type IEnvConfig<T> = IEnvConfigKeys<T>[keyof IEnvConfigKeys<T>]
+
+function mergeCtors(list: Set<ICtor<any>>, clazz: ICtor<any>){
+  let parent = clazz
+  while(parent && parent !== Object){
+    list.delete(parent)
+    parent = Object.getPrototypeOf(parent)
+  }
+  list.add(clazz)
+  return list
+}
+
+function isParentClass(lookup: ICtor<any>, other: ICtor<any>){
+  let parent = other
+  while(parent && parent !== Object){
+    if(parent === lookup){
+      return true
+    }
+    parent = Object.getPrototypeOf(parent)
+  }
+  return false
+}
+
+export class SystemRegistry<EnvConfig = {}>{
   /**
    * @param services A list of all service classes in the registry.
    * @param configs A list of all configuration instances in the registry.
+   * @param envConfigs Environment configurations
    */
   constructor(
-    readonly services: ReadonlyMap<ISystemServiceClass<any>, ISystemServiceClass<any>> = new Map(),
-    readonly configs: ReadonlyMap<ICtor<any>, any> = new Map(),
+    readonly services: ReadonlySet<ISystemServiceClass<any>> = new Set(),
+    readonly configs: ReadonlySet<ICtor<any>> = new Set(),
+    readonly envConfigs: ReadonlyMap<IEnvMode | string, IEnvConfig<EnvConfig>> = new Map(),
   ){}
 
   /**
    * Registers a configuration instance that services will use to configure themselves.
    * This is an immutable operation which returns a new instance of {@link SystemRegistry}
-   * @param overrideClass Class to override config for. Use this if
-   * you have extended a base config class and intend on replacing the base config
-   * with this config
    * @param config The configuration instance to add into the current registry
    */
-  withConfig<A, B extends A>(overrideClass: ICtor<A>, config: B): SystemRegistry
+  withConfig<T, K extends string>(config: IConfigCtor<T, K>): SystemRegistry<IMergeEnvConfig<EnvConfig, T, K>>{
+    const configs = new Set(this.configs)
+    mergeCtors(configs, config)
+    return new SystemRegistry(this.services, configs, this.envConfigs as any)
+  }
+
   /**
-   * Registers a configuration instance that services will use to configure themselves.
-   * This is an immutable operation which returns a new instance of {@link SystemRegistry}
-   * @param config The configuration instance to add into the current registry
+   * Registers an environment configuration for all configuration in the system.
+   * All configurations will extend off default configuration which extends off the initial
+   * class instance configuration
+   * @param env The environment to override configuration for
+   * @param config The optional overrides
+   * @param merge If true will merge with previous env config, false will replace entire env config
    */
-  withConfig<T>(config: T): SystemRegistry
-  withConfig(overrideClassOrConfig: any, configOrNothing?: any): SystemRegistry{
-    const overrideClass = configOrNothing ? overrideClassOrConfig : overrideClassOrConfig.constructor
-    const config = configOrNothing ?? overrideClassOrConfig
-
-    const configs = new Map(this.configs)
-    configs.set(overrideClass, config)
-
-    return new SystemRegistry(this.services, configs)
+  withEnvConfig<E extends IEnvMode | string>(env: E, config: IEnvConfig<EnvConfig>, merge = true){
+    const currentConfig = this.envConfigs.get(env)
+    const nextConfig = merge ? { ...currentConfig, ...config } : config
+    const confs = new Map(this.envConfigs)
+    confs.set(env, nextConfig)
+    return new SystemRegistry(this.services, this.configs, confs)
   }
 
   /**
@@ -87,58 +133,67 @@ export class SystemRegistry{
    * This is an immutable operation which returns a new instance of {@link SystemRegistry}
    * @param registry The registry to merge into the current registry
    */
-  withRegistry(registry: SystemRegistry): SystemRegistry{
-    const services = new Map(this.services)
-    for(const [ cls, serviceCls ] of registry.services){
-      services.set(cls, serviceCls)
+  withRegistry<C>(registry: SystemRegistry<C>): SystemRegistry<IMergeEnvConfigs<EnvConfig, C>>{
+    const services = new Set(this.services)
+    for(const cls of registry.services){
+      mergeCtors(services, cls)
     }
 
-    const configs = new Map(this.configs)
-    for(const [ cls, config ] of registry.configs){
-      configs.set(cls, config)
+    const configs = new Set(this.configs)
+    for(const cls of registry.configs){
+      mergeCtors(configs, cls)
     }
 
-    return new SystemRegistry(services, configs)
+    const envConfs = new Map(this.envConfigs)
+    for(const [ env, conf ] of registry.envConfigs){
+      const currentConfig = envConfs.get(env)
+      const nextConfig = { ...currentConfig, ...conf }
+      envConfs.set(env, nextConfig as any)
+    }
+
+    return new SystemRegistry(services, configs, envConfs as any)
   }
 
   /**
    * Registers a service class that will be automatically started when the system starts
    * This is an immutable operation which returns a new instance of {@link SystemRegistry}
-   * @param overrideClass Class to override service for. Use this if
-   * you have extended a base service class and intend on replacing the base service
-   * with this service
    * @param service The service class to add into the current registry
    */
-  withService<A, B extends A>(overrideClass: ICtor<A>, service: ISystemServiceClass<B>): SystemRegistry
-  /**
-   * Registers a service class that will be automatically started when the system starts
-   * This is an immutable operation which returns a new instance of {@link SystemRegistry}
-   * @param service The service class to add into the current registry
-   */
-  withService(service: ISystemServiceClass<any>): SystemRegistry
-  withService(overrideClass: any, serviceOrNothing?: any): SystemRegistry{
-    const service = serviceOrNothing ?? overrideClass
-
-    const services = new Map(this.services)
-    services.set(overrideClass, service)
-
-    return new SystemRegistry(services, this.configs)
+  withService(service: ISystemServiceClass<any>): SystemRegistry<EnvConfig>{
+    const services = new Set(this.services)
+    mergeCtors(services, service)
+    return new SystemRegistry(services, this.configs, this.envConfigs)
   }
 }
 
-export class SystemContainer{
+export class SystemContainer<EnvConfig = {}>{
+  protected readonly cachedClassLookups: Map<ICtor<any>, ICtor<any>> = new Map()
   protected readonly instances: Map<ISystemServiceClass<any>, ISystemService> = new Map()
   protected readonly running: Set<ISystemService> = new Set()
 
-  constructor(protected readonly registry: SystemRegistry){}
+  constructor(protected readonly registry: SystemRegistry<EnvConfig>){}
+
+  protected getClassByPrototypes(lookupClass: ISystemServiceClass<any>): ISystemServiceClass<any>{
+    if(this.cachedClassLookups.has(lookupClass)){
+      return this.cachedClassLookups.get(lookupClass)!
+    }
+    const classes = new Set([ ...this.registry.configs, ...this.registry.services ])
+    // search configs first
+    for(const cls of classes){
+      if(isParentClass(lookupClass, cls)){
+        this.cachedClassLookups.set(lookupClass, cls)
+        return cls
+      }
+    }
+    this.cachedClassLookups.set(lookupClass, lookupClass)
+    return lookupClass
+  }
 
   protected getInstanceInternal<T>(serviceClass: ISystemServiceClass<T>){
     const created = new Set<any>()
 
     const recursive = (lookupClass: ISystemServiceClass<any>, passedThrough: ReadonlySet<ISystemServiceClass<any>> = new Set()) => {
-      // ensure we are using the override class type
-      const clazz = this.registry.services.get(lookupClass) ?? lookupClass
-
+      const clazz = this.getClassByPrototypes(lookupClass)
       // check for cyclic dependencies
       if(passedThrough.has(clazz)){
         const depGraph = [ ...Array.from(passedThrough), clazz ].map(c => c.name).join(" -> ")
@@ -189,9 +244,19 @@ export class SystemContainer{
    * @param serviceClass
    */
   findInstance<T>(serviceClass: ISystemServiceClass<T>): T | undefined{
-    // find existing instance
+    // fastest is look for a specific instance
     const found = this.instances.get(serviceClass)
-    if(found)return found as T
+    if(found){
+      return found as T
+    }
+    // otherwise walk instance list and find
+    // another instance that is an instance of that instance
+    for(const instance of this.instances.values()){
+      if(instance instanceof serviceClass){
+        return instance as any
+      }
+    }
+    return undefined
   }
 
   /**

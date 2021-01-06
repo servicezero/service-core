@@ -1,20 +1,25 @@
 import type Logger from "@service-core/logging/logger"
 import { gracefulShutdown } from "@service-core/runtime/process"
 import {
+  IConfigCtor,
+  IEnvMode,
   SystemContainer,
   SystemRegistry,
   hasShutdown,
   hasStartup,
+  isConfigCtor,
 } from "@service-core/runtime/system-registry"
+import { deserializeTypeFromJson } from "@service-core/runtime/type-serializer"
 
-export class System extends SystemContainer{
+export class System<EnvConfig = {}> extends SystemContainer<EnvConfig>{
   protected isRunning = false
   protected readonly log: Logger
 
   constructor(
     log: Logger,
-    registry: SystemRegistry,
-    proc: NodeJS.Process = process,
+    registry: SystemRegistry<EnvConfig>,
+    protected readonly env: IEnvMode = "dev",
+    protected readonly proc: NodeJS.Process = process,
   ){
     super(registry)
     this.log = log.withLabels({
@@ -22,6 +27,40 @@ export class System extends SystemContainer{
     })
     // install gracefull shutdown procedure
     gracefulShutdown(log, () => this.shutdown(), proc)
+  }
+
+  protected createConfigInstance(envConf: Record<string, any>, cls: IConfigCtor<any, any>){
+    // extract all properties for the config
+    const prefix = `${ cls.envConfigPrefix }.`
+    const props = Object.fromEntries(
+      Object.entries(envConf)
+        .filter(([ k ]) => k.startsWith(prefix))
+        .map(([ k, v ]) => [ k.replace(prefix, ""), v ]),
+    )
+    return deserializeTypeFromJson(cls, props)
+  }
+
+  protected createEnvBoundConfig(){
+    // merge env configs
+    const envConf: Record<string, any> = {
+      ...this.registry.envConfigs.get("default"),
+      ...this.registry.envConfigs.get(this.env),
+    }
+    // find environment variable overrides
+    const envVars = new Map(Object.entries(this.proc.env ?? {}).map(([ k, v ]) => [ k.toLowerCase(), v ]))
+    // override with environment variable
+    for(const cls of this.registry.configs){
+      if(isConfigCtor(cls) && cls.class){
+        for(const key of Object.keys(cls.class)){
+          const envKey = `${ cls.envConfigPrefix }.${ key }`
+          const envVal = envVars.get(envKey.toLowerCase())
+          if(envVal !== null && envVal !== undefined){
+            envConf[envKey] = envVal
+          }
+        }
+      }
+    }
+    return envConf
   }
 
   /**
@@ -69,14 +108,16 @@ export class System extends SystemContainer{
     this.instances.set(this.log.constructor as any, this.log as any)
     this.instances.set(System, this)
     this.instances.set(SystemContainer, this)
-    // register configs
     const { configs, services } = this.registry
-    for(const [ cls, config ] of configs){
+    // merge env configs
+    const envConf = this.createEnvBoundConfig()
+    // register configs
+    for(const cls of configs){
+      const config = this.createConfigInstance(envConf, cls as any)
       this.instances.set(cls as any, config as any)
-      this.instances.set(config.constructor as any, config as any)
     }
     // Instantiate all services
-    for(const c of services.keys()){
+    for(const c of services){
       this.getInstance(c)
     }
     // Startup services

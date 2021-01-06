@@ -1,3 +1,4 @@
+import { createException } from "@service-core/runtime/exceptions"
 import {
   ICtor,
   ITypeDef,
@@ -8,12 +9,7 @@ import {
   getTypeDefForPath,
 } from "./type-specification"
 
-export class SerializationException extends Error{
-  constructor(message: string){
-    super(message)
-    this.name = this.constructor.name
-  }
-}
+export const SerializationException = createException("SerializationException")
 
 function getTypOfValue(value: any, numberTyp: Typ.Float | Typ.Int = Typ.Float): Typ | string | undefined{
   switch(true){
@@ -106,6 +102,20 @@ export function getInheritanceClassNameFromType(type: string): ICSharpClassRef{
   }
 }
 
+function deserializeArr(value: any){
+  if(value === null || value === undefined){
+    return []
+  } else if(typeof value === "string"){
+    return value.split(",")
+  } else if(Array.isArray(value)){
+    return value
+  } else if(typeof value?.[Symbol.iterator] === "function"){
+    return Array.from(value)
+  } else{
+    return []
+  }
+}
+
 function deserializeTypeDefFromJson(typeDef: ITypeDef, value: any): any{
   if(!typeDef.required && (value === null || value === undefined)){
     return undefined
@@ -138,20 +148,15 @@ function deserializeTypeDefFromJson(typeDef: ITypeDef, value: any): any{
     return isNaN(d.getTime()) ? new Date(0) : d
   }
   case Typ.Arr:{
-    const a = Array.isArray(value) ? value : []
-    a.forEach((v, i) => {
-      a[i] = deserializeTypeDefFromJson(typeDef.valType, v)
+    const arr = deserializeArr(value)
+    arr.forEach((v, i) => {
+      arr[i] = deserializeTypeDefFromJson(typeDef.valType, v)
     })
-    return a
+    return arr
   }
   case Typ.Set:{
-    let arr!: any[]
-    if(Array.isArray(value)){
-      arr = value
-    }else if(typeof value?.[Symbol.iterator] === "function"){
-      arr = Array.from(value)
-    }
-    return new Set((arr ?? []).map(v => deserializeTypeDefFromJson(typeDef.valType, v)))
+    const arr = deserializeArr(value)
+    return new Set(arr.map(v => deserializeTypeDefFromJson(typeDef.valType, v)))
   }
   case Typ.Map:{
     let kvs: any

@@ -486,7 +486,7 @@ const serializeData = {
 }
 
 const deserializeData = {
-  arr:                 [ "string[]", [ "a", "b" ], [ "a", "b" ], [ 1, 2 ], [ "1", "2" ], 23, [] ],
+  arr:                 [ "string[]", [ "a", "b" ], [ "a", "b" ], [ 1, 2 ], [ "1", "2" ], 23, [], "a,b", [ "a", "b" ] ],
   "arr[1]":            [ "array field", "s1", "s1", 12, "12", null, "" ],
   bigi:                [ "bigint", "14", 14n, 4.5, 0n, 4, 4n, "ee", 0n, "12", 12n, null, 0n ],
   bool:                [ "boolean", true, true, "true", true, 1, true, "1", true, false, false, "false", false, null, false ],
@@ -524,7 +524,7 @@ const deserializeData = {
   ostr:                [ "optional string", null, undefined ],
   ostrLit:             [ "optional string literal", null, undefined ],
   ouni:                [ "optional union", null, undefined ],
-  set:                 [ "Set<float>", [ "a", "b" ], new Set([ 0 ]), [ 1.12, -2.5 ], new Set([ 1.12, -2.5 ]) ],
+  set:                 [ "Set<float>", [ "a", "b" ], new Set([ 0 ]), [ 1.12, -2.5 ], new Set([ 1.12, -2.5 ]), "1.2,4.5", new Set([ 1.2, 4.5 ]) ],
   str:                 [ "string", 3, "3", "foobar", "foobar", null, "" ],
   strLit:              [ "string literal", "v2", "v2", "unknown", "v1", null, "v1" ],
   uni:                 [ "union",

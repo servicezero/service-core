@@ -5,6 +5,7 @@ import {
   ITypeDefUnion,
   Serializer,
   Typ,
+  TypeSpecificationException,
   asEnum,
   getOrCreateClassDef,
   getTypeDefForPath,
@@ -165,6 +166,10 @@ it("is ctor schema class", () => {
   expect(isCtorSchema(() => {
     // ignore
   })).toBeFalsy()
+})
+
+it("getOrCreateClassDef throws when not a valid schema", () => {
+  expect(() => getOrCreateClassDef({} as any)).toThrow(TypeSpecificationException)
 })
 
 it("specification to type definition primitive", () => {

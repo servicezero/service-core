@@ -8,8 +8,22 @@ import Logger from "@service-core/logging/logger"
 const shutdownMock = jest.fn()
 const startupMock = jest.fn()
 
-class ConfigA{}
-class ConfigB{}
+class ConfigA{
+  static readonly envConfigPrefix = "ConfigA"
+
+  bar!: string
+  foo!: string
+}
+class ConfigB extends ConfigA{
+}
+class ConfigBO extends ConfigB{
+}
+class ConfigC{
+  static readonly envConfigPrefix = "ConfigC"
+
+  cool!: string
+  yep!: number
+}
 
 class ServiceC{
   static inject = [ ConfigA ]
@@ -21,10 +35,10 @@ class ServiceC{
 }
 
 class ServiceA{
-  static inject = [ ConfigA, ConfigB, Logger ]
+  static inject = [ ConfigA, ConfigC, Logger ]
 
   constructor(readonly configA: ConfigA,
-              readonly configB: ConfigB,
+              readonly configB: ConfigC,
               readonly log: Logger){}
 
 }
@@ -49,19 +63,82 @@ const isAny = (o: any): o is any => !!o
 
 describe("system registry", () => {
   it("merges configs", () => {
-    const reg1 = new SystemRegistry().withConfig(new ConfigA())
-    const reg2 = reg1.withConfig(new ConfigB())
+    const reg1 = new SystemRegistry().withConfig(ConfigA)
+    const reg2 = reg1.withConfig(ConfigC)
     expect(reg1.configs.size).toBe(1)
     expect(reg2.configs.size).toBe(2)
   })
 
   it("merges configs with override class", () => {
-    const reg1 = new SystemRegistry().withConfig(new ConfigA())
-    const reg2 = reg1.withConfig(ConfigA, new ConfigB())
+    const reg1 = new SystemRegistry().withConfig(ConfigA)
+    const reg2 = reg1.withConfig(ConfigB)
     expect(reg1.configs.size).toBe(1)
     expect(reg2.configs.size).toBe(1)
-    expect(reg1.configs.get(ConfigA)).toBeInstanceOf(ConfigA)
-    expect(reg2.configs.get(ConfigA)).toBeInstanceOf(ConfigB)
+    expect(reg1.configs.has(ConfigA)).toBeTruthy()
+    expect(reg1.configs.has(ConfigB)).toBeFalsy()
+    expect(reg2.configs.has(ConfigA)).toBeFalsy()
+    expect(reg2.configs.has(ConfigB)).toBeTruthy()
+  })
+
+  it("merges env configs", () => {
+    const reg1 = new SystemRegistry()
+      .withConfig(ConfigA)
+      .withConfig(ConfigC)
+      .withEnvConfig("dev", {
+        "ConfigA.bar": "hi",
+        "ConfigC.yep": 20,
+      })
+      .withEnvConfig("si", {
+        "ConfigA.bar": "hii",
+      })
+    const reg2 = reg1.withConfig(ConfigB)
+      .withEnvConfig("dev", {
+        "ConfigA.bar": "hi2",
+      })
+      .withEnvConfig("si", {
+        "ConfigC.yep": 22,
+      })
+
+    expect(reg1.envConfigs.size).toBe(2)
+    expect(reg2.envConfigs.size).toBe(2)
+    expect(reg1.envConfigs.get("dev")).toEqual({
+      "ConfigA.bar": "hi",
+      "ConfigC.yep": 20,
+    })
+    expect(reg2.envConfigs.get("dev")).toEqual({
+      "ConfigA.bar": "hi2",
+      "ConfigC.yep": 20,
+    })
+    expect(reg1.envConfigs.get("si")).toEqual({
+      "ConfigA.bar": "hii",
+    })
+    expect(reg2.envConfigs.get("si")).toEqual({
+      "ConfigA.bar": "hii",
+      "ConfigC.yep": 22,
+    })
+  })
+
+  it("merges env configs with replace", () => {
+    const reg1 = new SystemRegistry()
+      .withConfig(ConfigA)
+      .withConfig(ConfigC)
+      .withEnvConfig("dev", {
+        "ConfigA.bar": "hi",
+        "ConfigC.yep": 20,
+      })
+    const reg2 = reg1.withConfig(ConfigB)
+      .withEnvConfig("dev", {
+        "ConfigA.bar": "hi2",
+      }, false)
+
+    expect(reg1.envConfigs.get("dev")).toEqual({
+      "ConfigA.bar": "hi",
+      "ConfigC.yep": 20,
+    })
+
+    expect(reg2.envConfigs.get("dev")).toEqual({
+      "ConfigA.bar": "hi2",
+    })
   })
 
   it("merges services", () => {
@@ -73,29 +150,57 @@ describe("system registry", () => {
 
   it("merges services with override class", () => {
     const reg1 = new SystemRegistry().withService(ServiceA)
-    const reg2 = reg1.withService(ServiceA, ServiceAO)
+    const reg2 = reg1.withService(ServiceAO)
     expect(reg1.services.size).toBe(1)
     expect(reg2.services.size).toBe(1)
-    expect(reg1.services.get(ServiceA)).toBe(ServiceA)
-    expect(reg2.services.get(ServiceA)).toBe(ServiceAO)
+    expect(reg1.services.has(ServiceA)).toBeTruthy()
+    expect(reg1.services.has(ServiceAO)).toBeFalsy()
+    expect(reg2.services.has(ServiceA)).toBeFalsy()
+    expect(reg2.services.has(ServiceAO)).toBeTruthy()
   })
 
   it("merges registries", () => {
     const reg1 = new SystemRegistry()
-      .withConfig(new ConfigA())
+      .withConfig(ConfigA)
       .withService(ServiceA)
+      .withEnvConfig("dev", {
+        "ConfigA.bar": "hi",
+        "ConfigA.foo": "bo",
+      })
+      .withEnvConfig("si", {
+        "ConfigA.bar": "hi2",
+        "ConfigA.foo": "bo2",
+      })
+
     const reg2 = new SystemRegistry()
-      .withConfig(new ConfigB())
+      .withConfig(ConfigC)
       .withService(ServiceB)
+      .withEnvConfig("dev", {
+        // @ts-ignore
+        "ConfigA.bar": "hii",
+        "ConfigC.yep": 20,
+      })
     const reg3 = reg1.withRegistry(reg2)
     expect(reg1.configs.size).toBe(1)
     expect(reg1.services.size).toBe(1)
+    expect(reg1.envConfigs.size).toBe(2)
 
     expect(reg2.configs.size).toBe(1)
     expect(reg2.services.size).toBe(1)
+    expect(reg2.envConfigs.size).toBe(1)
 
     expect(reg3.configs.size).toBe(2)
     expect(reg3.services.size).toBe(2)
+    expect(reg3.envConfigs.size).toBe(2)
+    expect(reg3.envConfigs.get("dev")).toEqual({
+      "ConfigA.bar": "hii",
+      "ConfigA.foo": "bo",
+      "ConfigC.yep": 20,
+    })
+    expect(reg3.envConfigs.get("si")).toEqual({
+      "ConfigA.bar": "hi2",
+      "ConfigA.foo": "bo2",
+    })
   })
 
 })
@@ -103,13 +208,13 @@ describe("system registry", () => {
 describe("system container", () => {
 
   const reg = new SystemRegistry()
-    .withConfig(new ConfigA())
-    .withConfig(new ConfigB())
+    .withConfig(ConfigA)
+    .withConfig(ConfigC)
     .withService(ServiceA)
     .withService(ServiceB)
     .withService(Logger)
 
-  let container: SystemContainer
+  let container: SystemContainer<any>
 
   beforeEach(() => {
     container = new SystemContainer(reg)
@@ -125,10 +230,19 @@ describe("system container", () => {
     container.getInstance(ServiceC)
 
     expect(container.findInstance(ConfigA)).toBeInstanceOf(ConfigA)
-    expect(container.findInstance(ConfigB)).toBeInstanceOf(ConfigB)
+    expect(container.findInstance(ConfigC)).toBeInstanceOf(ConfigC)
     expect(container.findInstance(ServiceA)).toBeInstanceOf(ServiceA)
     expect(container.findInstance(ServiceB)).toBeInstanceOf(ServiceB)
     expect(container.findInstance(ServiceC)).toBeInstanceOf(ServiceC)
+  })
+
+  it("find instance by inherited class", () => {
+    const reg = new SystemRegistry().withConfig(ConfigB)
+    const container = new SystemContainer(reg)
+    container.getInstance(ConfigB)
+
+    expect(container.findInstance(ConfigA)).toBeInstanceOf(ConfigB)
+    expect(container.findInstance(ConfigBO)).toBeUndefined()
   })
 
   it("find instances by predicate", () => {
@@ -136,12 +250,12 @@ describe("system container", () => {
     container.getInstance(ServiceB)
     container.getInstance(ServiceC)
 
-    const isConfigAorB = (o: any): o is ConfigA | ConfigB => o instanceof ConfigA || o instanceof ConfigB
+    const isConfigAorB = (o: any): o is ConfigA | ConfigC => o instanceof ConfigA || o instanceof ConfigC
 
     const instances = container.findAllInstances(isConfigAorB)
     expect(instances.length).toBe(2)
     expect(instances[0]).toBeInstanceOf(ConfigA)
-    expect(instances[1]).toBeInstanceOf(ConfigB)
+    expect(instances[1]).toBeInstanceOf(ConfigC)
   })
 
   it("get instance with Logger injection binds logger to class injecting it", () => {
@@ -160,11 +274,11 @@ describe("system container", () => {
   })
 
   it("get instance by concrete class or override class should be same instance", () => {
-    const container = new SystemContainer(reg.withService(ServiceA, ServiceAO))
+    const container = new SystemContainer(reg.withService(ServiceAO))
     expect(container.getInstance(ServiceA)).toBe(container.getInstance(ServiceAO))
     expect(container.getInstance(ServiceA)).toBeInstanceOf(ServiceAO)
 
-    const container1 = new SystemContainer(reg.withService(ServiceA, ServiceAO))
+    const container1 = new SystemContainer(reg.withService(ServiceAO))
     expect(container1.getInstance(ServiceAO)).toBe(container1.getInstance(ServiceA))
     expect(container1.getInstance(ServiceA)).toBeInstanceOf(ServiceAO)
   })
@@ -177,7 +291,7 @@ describe("system container", () => {
     const instances = container.findAllInstances(isAny)
     expect(instances.length).toBe(4)
     expect(instances[0]).toBeInstanceOf(ConfigA)
-    expect(instances[1]).toBeInstanceOf(ConfigB)
+    expect(instances[1]).toBeInstanceOf(ConfigC)
     expect(instances[2]).toBeInstanceOf(Logger)
     expect(instances[3]).toBeInstanceOf(ServiceA)
   })
