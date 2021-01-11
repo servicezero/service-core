@@ -4,7 +4,7 @@ import { compile } from "./typescript-transformer-utils"
 
 // language=ts
 const srcFileB = `
-    import { IClassSpec, Typ, int } from "@kindred-bff-core/runtime/type-specification"
+    import { IClassSpec, Typ, int } from "@service-core/runtime/type-specification"
 
     export enum EnumB{
         One  = "One 1",
@@ -64,7 +64,7 @@ const srcFileB = `
 // language=ts
 const srcFileA = `
     import { EnumB, SmallModel, IStrs, IModelE, IModelF, IModelG, Unions, BaseMergeModel } from "@test/a"
-    import { IClassSpec, int } from "@kindred-bff-core/runtime/type-specification"
+    import { IClassSpec, int } from "@service-core/runtime/type-specification"
 
     enum EnumA{
         One = 0,
@@ -229,6 +229,13 @@ const srcFileC = `
                                              Partial<Pick<BaseMergeModel, "en">>{}
     export class MergedModel{
     }
+
+    export class FindSomething{
+      constructor(
+        readonly ids: ReadonlySet<string>,
+        readonly bla: string | number | boolean,
+      ){}
+    }
 `
 
 // language=js
@@ -341,7 +348,7 @@ export class FullModel extends BaseModel {
                 enumNum: ["Enum", EnumA],
                 enumStr: ["Enum", EnumB],
                 cls: SmallModel,
-                uni: ["Union", "Str", "Float", SmallModel, ["Arr", "Str"]],
+                uni: ["Union", "Str", "Float", ["Arr", "Str"], SmallModel],
                 uniAlias: ["Union", UnionA, UnionB],
                 floatOpt: [true, "Float"],
                 bignOpt: [true, "BigInt"],
@@ -368,7 +375,7 @@ export class FullModel extends BaseModel {
             },
             name: "IModelD"
         },
-        uni: ["Union", "Str", "Float", SmallModel, ["Arr", "Str"]],
+        uni: ["Union", "Str", "Float", ["Arr", "Str"], SmallModel],
         uniAlias: ["Union", UnionA, UnionB],
         baseArr: ["Arr", "Str"],
         baseBool: "Bool",
@@ -411,7 +418,7 @@ FullModel.staticStr = "er";
 
 // language=js
 const srcFileBExp = `
-import { Typ } from "@kindred-bff-core/runtime/type-specification";
+import { Typ } from "@service-core/runtime/type-specification";
 export var EnumB;
 (function (EnumB) {
     EnumB["One"] = "One 1";
@@ -465,6 +472,16 @@ export class MergedModel {
         en: [true, "Enum", EnumB]
     };
 }
+export class FindSomething {
+    static class = {
+        ids: ["Set", "Str"],
+        bla: ["Union", "Str", "Float", "Bool"]
+    };
+    constructor(ids, bla) {
+        this.ids = ids;
+        this.bla = bla;
+    }
+}
 `
 
 it("transforms specification class", () => {
@@ -475,7 +492,7 @@ it("transforms specification class", () => {
   ]), {
     baseUrl: path.resolve("."),
     paths:   {
-      "@kindred-bff-core/*": [
+      "@service-core/*": [
         "src/*",
       ],
     },

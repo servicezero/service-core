@@ -63,7 +63,7 @@ function findEnumValue(value: any, typeDef: ITypeDefEnum | ITypeDefEnumLiteral):
   return typeDef.required ? typeDef.unmatchedValue : undefined
 }
 
-function findEnumKey(value: any, typeDef: ITypeDefEnum | ITypeDefEnumLiteral): string | undefined{
+export function findEnumKey(value: any, typeDef: ITypeDefEnum | ITypeDefEnumLiteral): string | undefined{
   // first look for value type
   const key = typeDef.vals.get(value)
   if(key !== undefined){
@@ -328,7 +328,7 @@ export function findDef<T>(schema: ICtor<T>, path = ""){
  * @return Restricted json object with only supported values of the schema
  * @throws SerializationException if type definition could not be found at path
  */
-export function deserializeTypeFromJson<T>(schema: ICtor<T>, json: object | string, path = ""): any{
+export function deserializeTypeFromJson<T>(schema: ICtor<T>, json: object | string, path = ""): T{
   const foundDef = findDef(schema, path)
   return deserializeTypeDefFromJson(foundDef, typeof json === "string" ? JSON.parse(json) : json)
 }

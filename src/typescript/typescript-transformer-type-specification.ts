@@ -22,7 +22,7 @@ import {
 import type { ITransformHelpers } from "./typescript-transformer-plugins"
 
 /**
- * Copied from @kindred-bff-core/runtime/type-specification
+ * Copied from @service-core/runtime/type-specification
  * So transformer is not reliant on enum
  */
 enum Typ{
@@ -48,7 +48,7 @@ export interface ITypeSpecificationTransformerOptions{
 }
 
 const defaultOptions: ITypeSpecificationTransformerOptions = {
-  fileNameMatcher: "(domain|model|message|event)",
+  fileNameMatcher: "(domain|model|message|event|config)",
   staticClassName: "class",
 }
 
@@ -131,6 +131,29 @@ function resolveTypes(typeChecker: ts.TypeChecker, propertyType: ts.Type, proper
     } else if(type.isUnion()){
       // Unions
       const typeNodes = typeNode && ts.isUnionTypeNode(typeNode) ? typeNode.types : undefined
+      // search for boolean literals
+      // can happen because typescript converts union with boolean into false | true
+      // const booleanLiteralTypes = type.types.filter(t => !!(t.flags & ts.TypeFlags.BooleanLiteral))
+      // const hasBooleanType = booleanLiteralTypes.length > 1
+      if(typeNodes){
+        const types = typeNodes.map(t => recursive(typeChecker.getTypeFromTypeNode(t), t, false, previousInterfaces))
+        // flatten deep unions
+        const unionTypes: any[] = []
+        const recursiveUnion = (par: any): any => {
+          if(Array.isArray(par) && par[0] === Typ.Union){
+            par.slice(1).forEach(recursiveUnion)
+          }else{
+            unionTypes.push(par)
+          }
+        }
+        types.forEach(recursiveUnion)
+
+        return opt([
+          Typ.Union,
+          ...unionTypes,
+        ])
+      }
+
       return opt([
         Typ.Union,
         ...type.types.map((t, i) => recursive(t, typeNodes?.[i], false, previousInterfaces)),

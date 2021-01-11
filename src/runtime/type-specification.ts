@@ -1,3 +1,5 @@
+import { createException } from "@service-core/runtime/exceptions"
+
 export type int = number
 
 type Mutable<T> = {
@@ -482,16 +484,27 @@ export function getOrCreateClassDef<T>(schema: ICtorSchema<T>): ITypeDefClass<T>
   return typeDef
 }
 
+export interface ITypeDefHierarchy{
+  readonly def?: ITypeDef
+  readonly found: boolean
+  readonly hierarchy: readonly ITypeDef[]
+}
+
 /**
- * Attempts to find matching type definition for the given path. This is mostly useful
- * when deserializing string values into specific types
+ * Attempts to find matching type definition hierarchy for the given path. This is mostly useful
+ * when deserializing flattened key / values
  * @param rootTypeDef The root type definition
  * @param path The path to look for nested type definition or "." for root definition
  */
-export function getTypeDefForPath(rootTypeDef: ITypeDef, path: string){
-  if(path === ""){
-    return rootTypeDef
+export function getTypeDefsForPath(rootTypeDef: ITypeDef, path: string): ITypeDefHierarchy{
+  if(path === "" || path === "."){
+    return {
+      def:       rootTypeDef,
+      found:     true,
+      hierarchy: [ rootTypeDef ],
+    }
   }
+  const hierarchy: ITypeDef[] = [ rootTypeDef ]
   let typeDef: ITypeDef | undefined = rootTypeDef
   let part = ""
   let inBrackets = false
@@ -500,6 +513,9 @@ export function getTypeDefForPath(rootTypeDef: ITypeDef, path: string){
   const nextDef = () => {
     if(!part)return
     typeDef = typeDef ? locateTypeDefByPath(typeDef, part) : undefined
+    if(typeDef){
+      hierarchy.push(typeDef)
+    }
     part = ""
   }
 
@@ -533,5 +549,20 @@ export function getTypeDefForPath(rootTypeDef: ITypeDef, path: string){
   }
   nextDef()
 
-  return typeDef
+  return {
+    def:   typeDef,
+    found: !!typeDef,
+    hierarchy,
+  }
+}
+
+/**
+ * Attempts to find matching type definition for the given path. This is mostly useful
+ * when deserializing string values into specific types
+ * @param rootTypeDef The root type definition
+ * @param path The path to look for nested type definition or "" or "." for root definition
+ */
+export function getTypeDefForPath(rootTypeDef: ITypeDef, path: string): ITypeDef | undefined{
+  const defs = getTypeDefsForPath(rootTypeDef, path)
+  return defs.def
 }

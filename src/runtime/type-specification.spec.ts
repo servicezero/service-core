@@ -9,6 +9,7 @@ import {
   asEnum,
   getOrCreateClassDef,
   getTypeDefForPath,
+  getTypeDefsForPath,
   isCtorSchema,
 } from "./type-specification"
 
@@ -364,6 +365,19 @@ it("get type definition for nested path", () => {
   expect(getTypeDefForPath(fullModelSpec, "arr[1]")).toBe((fullModelSpec.propertiesByName["arr"] as ITypeDefArr).valType)
   expect(getTypeDefForPath(fullModelSpec, "cls['str']")).toBe((fullModelSpec.propertiesByName["cls"] as ITypeDefClass).propertiesByName["str"])
   expect(getTypeDefForPath(fullModelSpec, "cls.str")).toBe((fullModelSpec.propertiesByName["cls"] as ITypeDefClass).propertiesByName["str"])
+})
+
+it("get type definitions for nested path", () => {
+  const defs = getTypeDefsForPath(fullModelSpec, "cls['str']")
+  expect(defs).toEqual({
+    def:       (fullModelSpec.propertiesByName["cls"] as ITypeDefClass).propertiesByName["str"],
+    found:     true,
+    hierarchy: [
+      fullModelSpec,
+      fullModelSpec.propertiesByName["cls"],
+      (fullModelSpec.propertiesByName["cls"] as ITypeDefClass).propertiesByName["str"],
+    ],
+  })
 })
 
 it("get type definition for nested path with complex property name", () => {

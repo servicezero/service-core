@@ -44,8 +44,14 @@ function visitDeclaration<T extends ts.ClassDeclaration | ts.EnumDeclaration | t
   }else if(ts.isEnumDeclaration(declaration)){
     node = factory.updateEnumDeclaration(declaration, declaration.decorators, declaration.modifiers, name, declaration.members) as T
   }else if(ts.isClassDeclaration(declaration)){
+    let members: any[] = declaration.members as any
+    if(declaration.name?.text){
+      const staticName = factory.createPropertyDeclaration(undefined, factory.createModifiersFromModifierFlags(ts.ModifierFlags.Static),
+        "name", undefined, undefined, factory.createStringLiteral(declaration.name.text))
+      members = [ staticName, ...members ]
+    }
     node = factory.updateClassDeclaration(declaration, declaration.decorators, declaration.modifiers, name, declaration.typeParameters,
-      declaration.heritageClauses, declaration.members) as T
+      declaration.heritageClauses, members) as T
   }
   return {
     exportedNames: [ declaration.name!.text ],

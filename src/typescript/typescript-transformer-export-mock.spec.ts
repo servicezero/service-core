@@ -82,6 +82,7 @@ export let EnumB = EnumB$1;
     EnumB["None"] = "None";
 })(EnumB || (EnumB = {}));
 export class CustomClassDef$1 {
+    static name = "CustomClassDef";
     constructor() {
         const bla = EnumB.One;
     }
@@ -162,7 +163,7 @@ it("transforms export mocks", () => {
   ]), {
     baseUrl: path.resolve("."),
     paths:   {
-      "@kindred-bff-core/*": [
+      "@service-core/*": [
         "src/*",
       ],
     },
