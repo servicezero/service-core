@@ -15,6 +15,16 @@ First install homebrew [https://brew.sh/](https://brew.sh/).
 Install coreutils package.
 ```bash
 brew install coreutils
+### Publishing packages to Nexus
+
+To publish packages run the following commands.
+
+```bash
+export CI_VERSION="{Sem Ver}"
+npm run build:cjs:release
+npm run build:esm:release
+npm run bundle:packages
+
 ```
 
 ### Scripts
@@ -59,7 +69,7 @@ Once you have checked, tested and linted your code you may create a commit.
 The repo uses a CI pipeline to build, test and deploy code.
 To create a feature deployment create a feature branch using the convention `/feature/{FEATURE_NAME}`.
 This will run the pipeline and deploy your feature. Once you are ready for your feature to be merged raise
-a `Merge Request`, once approved and merged into master the feature will be released into artifactory.
+a `Merge Request`, once approved and merged into master the feature will be released into nexus.
 
 ## IDE's
 

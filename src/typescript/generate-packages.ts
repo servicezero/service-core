@@ -11,13 +11,22 @@ import {
 } from "fs"
 import { cruise } from "dependency-cruiser"
 
-function getCliArg(prop: string){
+function getCliArg(prop: string, required: false): string | undefined
+function getCliArg(prop: string): string
+function getCliArg(prop: string, required = true): string | undefined{
   const idx = process.argv.indexOf("--" + prop)
   const val = idx >= 0 ? process.argv[idx + 1] : undefined
-  if(!val){
+  if(!val && required){
     throw new Error(`Required cli argument is not defined --${ prop }`)
   }
   return val
+}
+
+function getEnvArg(prop: string){
+  if(!process.env[prop]){
+    throw new Error(`Required env var is not defined ${ prop }`)
+  }
+  return process.env[prop]!
 }
 
 function walkDir(rootdir: string, filter?: (file: string) => boolean, dirFilter?: (dir: string) => boolean){
@@ -88,6 +97,18 @@ function getUsedModules(buildDir: string, modulePaths: any, serviceName: string)
       }
     })))
     .filter(m => rootPackageJsonObj.dependencies.hasOwnProperty(m))
+  // find project modules used
+  const modulePathEntries = (Object.entries(modulePaths) as ([string, readonly string[]])[])
+    // exclude current package
+    .filter(m => !m[0].endsWith(`/${ serviceName }`))
+  const projectModuleNames = Array.from(new Set(dependencies.modules
+    .map(m => path.resolve(m.source))
+    .map(m => {
+      const mod = modulePathEntries.find(({ 1: v }) => v.some(vs => m.startsWith(vs)))
+      return mod?.[0]
+    })
+    .filter(m => !!m),
+  ))
   // find types
   const nodeModuleTypings = nodeModuleNames
     .map(name => `@types/${ name }`)
@@ -100,7 +121,7 @@ function getUsedModules(buildDir: string, modulePaths: any, serviceName: string)
   ))
 
   return {
-    nodeModuleNames: [ ...nodeModuleTypings, ...nodeModuleNames ].sort(),
+    nodeModuleNames: [ ...nodeModuleTypings, ...nodeModuleNames, ...projectModuleNames ].sort() as string[],
     usedFiles,
   }
 }
@@ -128,15 +149,23 @@ function copyOtherFiles(serviceDir: string, bundleDir: string){
   }
 }
 
-function mergePackageJson(rootPackageJsonObj: any, rootPackageLockJsonObj: any, servicePackageJsonObj: any, bundleDependencies: any, serviceName: string){
+function mergePackageJson(rootPackageJsonObj: any, rootPackageLockJsonObj: any, servicePackageJsonObj: any, bundleDependencies: readonly string[], serviceName: string, projectVer: string){
   const name = getServicePackageName(rootPackageJsonObj.name, serviceName)
   // create updated package json
   const mergedPackageJson = {
     ...rootPackageJsonObj,
     ...servicePackageJsonObj,
     // bundleDependencies,
-    dependencies: Object.fromEntries(Object.entries(rootPackageJsonObj.dependencies).filter(([ k ]) => bundleDependencies.includes(k))),
+    dependencies: Object.fromEntries(bundleDependencies.map(dep => {
+      const rootPkg = rootPackageJsonObj.dependencies[dep]
+      if(rootPkg){
+        return [ dep, rootPkg ]
+      }else{
+        return [ dep, projectVer ]
+      }
+    })),
     name,
+    version: projectVer,
   }
   // clean package json
   delete mergedPackageJson.devDependencies
@@ -149,6 +178,7 @@ function mergePackageJson(rootPackageJsonObj: any, rootPackageLockJsonObj: any, 
   const mergedPackageLockJson = {
     ...rootPackageLockJsonObj,
     name,
+    version: projectVer,
   }
 
   return {
@@ -158,10 +188,16 @@ function mergePackageJson(rootPackageJsonObj: any, rootPackageLockJsonObj: any, 
 }
 
 const projectDir = path.resolve(getCliArg("project"))
+let projectVer = getEnvArg("BUILD_VERSION")
 const rootPackageJson = path.resolve(projectDir, "package.json")
 const rootPackageJsonObj = loadPackageJson(rootPackageJson)
 const rootPackageLockJson = path.resolve(projectDir, "package-lock.json")
 const rootPackageLockJsonObj = loadPackageJson(rootPackageLockJson)
+// set default version to package version
+if(!projectVer){
+  projectVer = rootPackageLockJsonObj.version
+}
+
 const srcDir = path.resolve(projectDir, "src")
 const buildDir = path.resolve(projectDir, "build")
 const buildBundlesDir = path.resolve(projectDir, "build/.bundles")
@@ -188,7 +224,7 @@ function generatePackage(serviceName: string){
     // copy other files
     copyOtherFiles(serviceDir, serviceBundleDir)
     // create updated package json
-    const { mergedPackageJson, mergedPackageLockJson } = mergePackageJson(rootPackageJsonObj, rootPackageLockJsonObj, servicePackageJsonObj, used.nodeModuleNames, serviceName)
+    const { mergedPackageJson, mergedPackageLockJson } = mergePackageJson(rootPackageJsonObj, rootPackageLockJsonObj, servicePackageJsonObj, used!.nodeModuleNames, serviceName, projectVer!)
     // write package json
     mkdirSync(serviceBundleDir, { recursive: true })
     writeFileSync(path.resolve(serviceBundleDir, "package.json"), JSON.stringify(mergedPackageJson, undefined, 2), { encoding: "utf-8", flag: "w" })
