@@ -26,14 +26,14 @@ export default function template({ name, repository }: IInitProjectConfig){
   "license": "UNLICENSED",
   "devDependencies": {},
   "//dependencies": {
-    "${ packageName }": "${ packageVersion }"
+    "@service-core/logging": "${ packageVersion }"
   },
   "dependencies": {
     "typescript": "^4.0.2"
   },
   "eslintConfig": {
     "extends": [
-      "${ packageName }/eslint-config/recommended.cjs"
+      "@service-core/eslint-config/recommended.js"
     ],
     "parserOptions": {
       "project": "tsconfig.json"

@@ -1,12 +1,11 @@
 // eslint-disable-next-line filenames/match-exported
-import { packageName } from "@service-core/config"
-import type { IInitProjectConfig } from "@service-core/initializer/init-project"
+import type { IInitProjectConfig } from "@kindred-bff-core/initializer/init-project"
 
 export default function template({ name }: IInitProjectConfig){
   // language=tsconfig
   return`
 {
-  "extends": "${ packageName }/typescript/tsconfig.json",
+  "extends": "@service-core/typescript/tsconfig.json",
   "compilerOptions": {
     "baseUrl": ".",
     "outDir": "build",

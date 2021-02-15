@@ -34,10 +34,19 @@ export interface ISystemServiceStartup{
   startup(): Promise<void>
 }
 
-export interface ISystemService extends Partial<ISystemServiceShutdown>, Partial<ISystemServiceStartup>{
+export interface ISystemServiceExternalHealthCheck{
+  /**
+   * Healthcheck method for external services not in
+   * control by this node process, such as databases.
+   * @return true if health check succeeding
+   */
+  externalHealthCheck(): Promise<boolean>
 }
 
-export type IEnvMode = "default" | "dev" | "pr" | "pt" | "qa" | "sbx" | "si" | "test"
+export interface ISystemService extends Partial<ISystemServiceShutdown>, Partial<ISystemServiceStartup>, Partial<ISystemServiceExternalHealthCheck>{
+}
+
+export type IEnvMode = "default" | "dev" | "dockerdev" | "pr" | "pt" | "qa" | "sbx" | "si" | "test"
 
 interface ISystemServiceClass<T extends ISystemService>{
   /**
@@ -53,6 +62,10 @@ export function hasShutdown(o: any): o is ISystemServiceShutdown{
 
 export function hasStartup(o: any): o is ISystemServiceStartup{
   return o !== null && typeof o === "object" && typeof o.startup === "function"
+}
+
+export function hasExternalHealthCheck(o: any): o is ISystemServiceExternalHealthCheck{
+  return o !== null && typeof o === "object" && typeof o.externalHealthCheck === "function"
 }
 
 export const CyclicDependenciesException = createException("CyclicDependenciesException")
@@ -301,7 +314,7 @@ export class SystemContainer<EnvConfig = {}>{
       return false
     }
 
-    await asyncTimeout(service.shutdown())
+    await asyncTimeout(service.shutdown(), 30000)
     this.running.delete(service)
     return true
   }
@@ -318,7 +331,7 @@ export class SystemContainer<EnvConfig = {}>{
       return false
     }
 
-    await asyncTimeout(service.startup())
+    await asyncTimeout(service.startup(), 30000)
     this.running.add(service)
     return true
   }
