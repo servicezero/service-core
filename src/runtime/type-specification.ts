@@ -409,6 +409,11 @@ function classSpecToPropDefs(spec: any, required = true, reg = new Map<ICtorSche
     for(const [ key, prop ] of Object.entries(spec.class)){
       const typeDef = classSpecToPropDefs(prop, true, reg, nestedTypeRegistry) as Mutable<IPropDef>
       typeDef.name = key
+      if(typeDef.type === Typ.Union){
+        for(const v of Object.values(typeDef.values)){
+          (v as any).name = key
+        }
+      }
       innerDef[key] = typeDef
       properties.push(typeDef)
     }
@@ -427,29 +432,36 @@ function classToClassDef<T>(ctor: ICtorSchema<T>): ITypeDefClass<T>{
   return classSpecToPropDefs(ctor) as ITypeDefClass<T>
 }
 
-function locateTypeDefByPath(typeDef: ITypeDef, part: string): ITypeDef | undefined{
+function locateTypeDefByPath(typeDef: ITypeDef, part: string): ITypeDef[] | undefined{
   switch(typeDef.type){
-  case Typ.Class:
-    return typeDef.propertiesByName[part]
+  case Typ.Class:{
+    const d = typeDef.propertiesByName[part]
+    return d ? [ d ] : undefined
+  }
   case Typ.Arr:
-  case Typ.Map:
-    return typeDef.valType
-  case Typ.Union:
+  case Typ.Map:{
+    const d = typeDef.valType
+    return d ? [ d ] : undefined
+  }
+  case Typ.Union:{
     // if nested in union then first look for arrays
     if(/^\d+$/.test(part)){
-      return typeDef.values[Typ.Arr]?.valType
+      const d = typeDef.values[Typ.Arr]?.valType
+      return d ? [ d ] : undefined
     }
     // then look for class types
     for(const [ key, innerDef ] of Object.entries(typeDef.values)){
       if(!(key in Typ)){
         const found = locateTypeDefByPath(innerDef, part)
         if(found){
-          return found
+          return [ innerDef, ...found ]
         }
       }
     }
     // then look for maps
-    return typeDef.values[Typ.Map]?.valType
+    const d = typeDef.values[Typ.Map]?.valType
+    return d ? [ d ] : undefined
+  }
   }
 }
 
@@ -488,6 +500,7 @@ export interface ITypeDefHierarchy{
   readonly def?: ITypeDef
   readonly found: boolean
   readonly hierarchy: readonly ITypeDef[]
+  readonly paths: readonly (number | string)[]
 }
 
 /**
@@ -502,33 +515,33 @@ export function getTypeDefsForPath(rootTypeDef: ITypeDef, path: string): ITypeDe
       def:       rootTypeDef,
       found:     true,
       hierarchy: [ rootTypeDef ],
+      paths:     [],
     }
   }
   const hierarchy: ITypeDef[] = [ rootTypeDef ]
+  const paths: (number | string)[] = []
   let typeDef: ITypeDef | undefined = rootTypeDef
   let part = ""
-  let inBrackets = false
   let inQuotes = false
 
   const nextDef = () => {
     if(!part)return
-    typeDef = typeDef ? locateTypeDefByPath(typeDef, part) : undefined
-    if(typeDef){
-      hierarchy.push(typeDef)
+    paths.push(/^\d+$/.test(part) ? parseInt(part, 10) : part)
+    const tDefs = typeDef ? locateTypeDefByPath(typeDef, part) : undefined
+    if(tDefs){
+      tDefs.forEach(d => hierarchy.push(d))
+      typeDef = tDefs[tDefs.length - 1]
+    }else{
+      typeDef = undefined
     }
     part = ""
   }
 
   for(let i = 0, ii = path.length; i < ii; i++){
-    // stop processing if no type def
-    if(!typeDef){
-      break
-    }
     const c = path[i]
     switch(true){
     case !inQuotes && c === "[":
       nextDef()
-      inBrackets = true
       if(path[i + 1] === "'"){
         inQuotes = true
         i++
@@ -537,12 +550,10 @@ export function getTypeDefsForPath(rootTypeDef: ITypeDef, path: string): ITypeDe
     case inQuotes && c === "'" && path[i + 1] === "]":
       nextDef()
       inQuotes = false
-      inBrackets = false
       i++
       continue
     case !inQuotes && (c === "]" || c === "."):
       nextDef()
-      inBrackets = false
       continue
     }
     part += c
@@ -550,9 +561,11 @@ export function getTypeDefsForPath(rootTypeDef: ITypeDef, path: string): ITypeDe
   nextDef()
 
   return {
-    def:   typeDef,
-    found: !!typeDef,
-    hierarchy,
+    def:       typeDef,
+    found:     !!typeDef,
+    // remove all intermediary Union types
+    hierarchy: hierarchy.filter((h, i) => i === hierarchy.length - 1 || h.type !== Typ.Union),
+    paths,
   }
 }
 

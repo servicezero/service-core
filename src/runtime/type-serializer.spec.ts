@@ -486,7 +486,7 @@ const serializeData = {
 }
 
 const deserializeData = {
-  arr:                 [ "string[]", [ "a", "b" ], [ "a", "b" ], [ 1, 2 ], [ "1", "2" ], 23, [], "a,b", [ "a", "b" ] ],
+  arr:                 [ "string[]", [ "a", "b" ], [ "a", "b" ], [ 1, 2 ], [ "1", "2" ], 23, [ "23" ], "a,b", [ "a", "b" ] ],
   "arr[1]":            [ "array field", "s1", "s1", 12, "12", null, "" ],
   bigi:                [ "bigint", "14", 14n, 4.5, 0n, 4, 4n, "ee", 0n, "12", 12n, null, 0n ],
   bool:                [ "boolean", true, true, "true", true, 1, true, "1", true, false, false, "false", false, null, false ],

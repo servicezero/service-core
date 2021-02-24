@@ -106,6 +106,12 @@ function resolveTypes(typeChecker: ts.TypeChecker, propertyType: ts.Type, proper
     }
     const widenedType = typeChecker.getWidenedType(type)
 
+    // ignore functions
+    const callSigs = type.getCallSignatures()
+    if(callSigs && callSigs.length > 0){
+      return undefined
+    }
+
     // Enums
     if(type.flags & (ts.TypeFlags.EnumLiteral | ts.TypeFlags.EnumLike)){
       requiredImportRefs.add(getAbsoluteTypeRef(type))
@@ -239,7 +245,7 @@ function resolveModulePaths({ paths, baseUrl = "." }: ts.CompilerOptions): IModu
         if(!relPath.endsWith("/")){
           relPath += "/"
         }
-        projectRelativePathsToModuleName.set(path.resolve(rootDir, relPath), moduleName)
+        projectRelativePathsToModuleName.set(path.normalize(path.resolve(rootDir, relPath)), moduleName)
       }
     }
   }
@@ -248,11 +254,12 @@ function resolveModulePaths({ paths, baseUrl = "." }: ts.CompilerOptions): IModu
   const mappings = new Map(entries.sort((o1, o2) => o2[0].length - o1[0].length))
   return {
     findModuleName(filePath: string){
+      const filePathNormal = path.normalize(filePath)
       for(const [ dir, moduleName ] of mappings.entries()){
-        if(filePath.startsWith(dir)){
+        if(filePathNormal.startsWith(dir)){
           return {
             moduleName,
-            modulePath: `${ moduleName }/${ filePath.replace(dir, "") }`.replace(/\/+/, "/"),
+            modulePath: `${ moduleName }/${ filePathNormal.replace(dir, "") }`.replace(/\/+/, "/"),
           }
         }
       }

@@ -315,8 +315,8 @@ it("specification to type definition union or undefined", () => {
     required: false,
     type:     Typ.Union,
     values:   {
-      [Typ.Str]: { required: true, type: Typ.Str },
-      [Typ.Int]: { required: true, type: Typ.Int },
+      [Typ.Str]: { name: "uniOpt", required: true, type: Typ.Str },
+      [Typ.Int]: { name: "uniOpt", required: true, type: Typ.Int },
     },
   }))
 })
@@ -377,6 +377,47 @@ it("get type definitions for nested path", () => {
       fullModelSpec.propertiesByName["cls"],
       (fullModelSpec.propertiesByName["cls"] as ITypeDefClass).propertiesByName["str"],
     ],
+    paths: [ "cls", "str" ],
+  })
+})
+
+it("get type definitions for union path", () => {
+  const defs = getTypeDefsForPath(fullModelSpec, "uni")
+  expect(defs).toEqual({
+    def:       fullModelSpec.propertiesByName["uni"],
+    found:     true,
+    hierarchy: [
+      fullModelSpec,
+      fullModelSpec.propertiesByName["uni"],
+    ],
+    paths: [ "uni" ],
+  })
+})
+
+it("get type definitions for union path with nested path", () => {
+  const defs = getTypeDefsForPath(fullModelSpec, "uni.str")
+  expect(defs).toEqual({
+    def:       (fullModelSpec.propertiesByName["uni"] as ITypeDefUnion).values[SmallModel.name].propertiesByName["str"],
+    found:     true,
+    hierarchy: [
+      fullModelSpec,
+      (fullModelSpec.propertiesByName["uni"] as ITypeDefUnion).values[SmallModel.name],
+      (fullModelSpec.propertiesByName["uni"] as ITypeDefUnion).values[SmallModel.name].propertiesByName["str"],
+    ],
+    paths: [ "uni", "str" ],
+  })
+})
+
+it("get type definitions for union path with nested path not found", () => {
+  const defs = getTypeDefsForPath(fullModelSpec, "uni.cool[1]")
+  expect(defs).toEqual({
+    def:       undefined,
+    found:     false,
+    hierarchy: [
+      fullModelSpec,
+      fullModelSpec.propertiesByName["uni"],
+    ],
+    paths: [ "uni", "cool", 1 ],
   })
 })
 

@@ -38,6 +38,10 @@ const srcFileB = `
 
     export type IStrs = "v1" | "v2" | "v3"
 
+    interface IFn{
+      (foo: string): string
+    }
+
     export interface IModelE{
         str: IStrs
         int: 0 | 1 | -2
@@ -48,6 +52,7 @@ const srcFileB = `
         readonly falsy: false
         readonly strOpt?: IStrs
         readonly intOpt?: 0n | 1n | -2n
+        readonly fn: IFn
 
         ignored(): string
         ignored2: () => string

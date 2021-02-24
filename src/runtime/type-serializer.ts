@@ -112,7 +112,7 @@ function deserializeArr(value: any){
   } else if(typeof value?.[Symbol.iterator] === "function"){
     return Array.from(value)
   } else{
-    return []
+    return [ value ]
   }
 }
 
