@@ -1,5 +1,5 @@
 // eslint-disable-next-line filenames/match-exported
-import type { IInitProjectConfig } from "@kindred-bff-core/initializer/init-project"
+import type { IInitProjectConfig } from "@service-core/initializer/init-project"
 
 export default function template({ name }: IInitProjectConfig){
   // language=tsconfig

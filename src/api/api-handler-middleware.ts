@@ -61,20 +61,19 @@ export default class ApiHandlerMiddleware implements IApiMiddleware{
         return
       }
       // create correlation id for the request
-      const correlationId = uuid()
+      let correlationId: string | undefined
       try{
+        const logLabels = this.config.apiRequestToLogLabels(req) ?? {}
+        correlationId = logLabels.correlationId?.toString()
         // Run with logging context so every log contains
         // context bound information
-        await this.log.withContext({
-          correlationId,
-          requestUrl: req.url,
-        }, async() => {
+        await this.log.withContext(logLabels, async() => {
           let msg: any
           // deserialize request for GET
           if(method === "GET"){
             msg = deserializeTypeFromRequest(handler.constructor.api.message, req.query as any)
           }else{
-            msg = deserializeTypeFromJson(handler.constructor.api.message, req.body)
+            msg = deserializeTypeFromJson(handler.constructor.api.message, req.body ?? {})
           }
           const response = await handler.handle(msg)
           // serialize response
@@ -83,7 +82,12 @@ export default class ApiHandlerMiddleware implements IApiMiddleware{
           res.json(json)
         })
       } catch(e){
-        await this.log.error(e)
+        let log = this.log
+        if(!correlationId){
+          correlationId = uuid()
+          log = this.log.withLabels({ correlationId })
+        }
+        await log.error(e)
         const err = createExceptionPayload(correlationId, e)
         res.status(err.statusCode)
         res.json(err)

@@ -35,7 +35,7 @@ export function createExceptionPayload(correlationId: string, err: Error): IExce
   return {
     correlationId,
     error: {
-      message: "Sorry an error has occured on the server, please quote correlation id as reference for further investigation",
+      message: "Sorry an error has occurred on the server, please quote correlation id as reference for further investigation",
       name:    err.name,
     },
     statusCode,

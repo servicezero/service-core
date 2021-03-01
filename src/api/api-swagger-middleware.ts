@@ -4,6 +4,7 @@ import {
   IApiMiddleware,
   isApiHandler,
 } from "@service-core/api/handlers"
+import Logger from "@service-core/logging/logger"
 import { SystemContainer } from "@service-core/runtime/system-registry"
 import { findEnumKey } from "@service-core/runtime/type-serializer"
 import {
@@ -18,7 +19,7 @@ import { URL } from "url"
 
 const isNotUndefined = <T>(o: T): o is NonNullable<T> => !(o === null || o === undefined)
 
-function swaggerHtmlTemplate(docsUrl: string){
+function swaggerHtmlTemplate(docsUrl: string, swaggerUrl: string){
   return `
 <!-- HTML for static distribution bundle build -->
 <!DOCTYPE html>
@@ -26,9 +27,9 @@ function swaggerHtmlTemplate(docsUrl: string){
   <head>
     <meta charset="UTF-8">
     <title>Swagger UI</title>
-    <link rel="stylesheet" type="text/css" href="./swagger-ui.css" />
-    <link rel="icon" type="image/png" href="./favicon-32x32.png" sizes="32x32" />
-    <link rel="icon" type="image/png" href="./favicon-16x16.png" sizes="16x16" />
+    <link rel="stylesheet" type="text/css" href="${ swaggerUrl }/swagger-ui.css" />
+    <link rel="icon" type="image/png" href="${ swaggerUrl }/favicon-32x32.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="${ swaggerUrl }/favicon-16x16.png" sizes="16x16" />
     <style>
       html
       {
@@ -55,8 +56,8 @@ function swaggerHtmlTemplate(docsUrl: string){
   <body>
     <div id="swagger-ui"></div>
 
-    <script src="./swagger-ui-bundle.js" charset="UTF-8"> </script>
-    <script src="./swagger-ui-standalone-preset.js" charset="UTF-8"> </script>
+    <script src="${ swaggerUrl }/swagger-ui-bundle.js" charset="UTF-8"> </script>
+    <script src="${ swaggerUrl }/swagger-ui-standalone-preset.js" charset="UTF-8"> </script>
     <script>
     window.onload = function() {
       // Begin Swagger UI call region
@@ -79,7 +80,7 @@ function swaggerHtmlTemplate(docsUrl: string){
 `
 }
 
-function parseSchema(rootDef: ITypeDef, rootDefaultValue?: any){
+function parseSchema(rootDef: ITypeDef, schemaType: "req" | "res", rootDefaultValue?: any){
   const recursive = (def: ITypeDef, defaultValue?: any): any => {
     switch(def.type){
     case Typ.Str:
@@ -95,7 +96,18 @@ function parseSchema(rootDef: ITypeDef, rootDefaultValue?: any){
     case Typ.Buff:
       return { format: "byte", type: "string" }
     case Typ.Date:
-      return { default: "YYYY-MM-DDThh:mm:ss.sssZ", format: "date-time", type: "string" }
+      if(schemaType === "req"){
+        return { format: "date-time", type: "string" }
+      }else{
+        return {
+          properties: {
+            unixms: { format: "int32", type: "integer" },
+            value:  { format: "date-time", type: "string" },
+          },
+          required: [ "unixms", "value" ],
+          type:     "object",
+        }
+      }
     case Typ.Arr:
     case Typ.Set:
       return { default: defaultValue, items: recursive(def.valType), type: "array" }
@@ -104,9 +116,8 @@ function parseSchema(rootDef: ITypeDef, rootDefaultValue?: any){
     case Typ.Enum:
     case Typ.EnumLiteral:
       return {
-        default: defaultValue ?? findEnumKey(def.unmatchedValue, def),
-        enum:    Array.from(def.vals.keys()).map(v => findEnumKey(v, def)),
-        type:    "string",
+        enum: Array.from(def.vals.keys()).map(v => findEnumKey(v, def)),
+        type: "string",
       }
     case Typ.Class:{
       // loop through class properties
@@ -124,7 +135,26 @@ function parseSchema(rootDef: ITypeDef, rootDefaultValue?: any){
     }
     case Typ.Union:{
       return {
-        oneOf: Object.values(def.values).map(t => recursive(t)),
+        oneOf: Object.entries(def.values).map(([ typ, t ]) => {
+          const value = recursive(t)
+          if(value.type === "object"){
+            return {
+              ...value,
+              properties: {
+                _typ: { enum: [ typ ], type: "string" },
+                ...value.properties,
+              },
+            }
+          }else{
+            return {
+              properties: {
+                _typ: { enum: [ typ ], type: "string" },
+                value,
+              },
+              type: "object",
+            }
+          }
+        }),
       }
     }
     }
@@ -135,7 +165,7 @@ function parseSchema(rootDef: ITypeDef, rootDefaultValue?: any){
 function requestBody(schemaName: string){
   return {
     content: {
-      "*/*": {
+      "application/json": {
         schema: {
           $ref: `#/components/schemas/${ schemaName }`,
         },
@@ -149,7 +179,7 @@ function requestBody(schemaName: string){
 function parseParameters(rootDef: ITypeDef, inside: "header" | "path" | "query"){
   const parameters: any[] = []
 
-  const recursive = (def: ITypeDef, name: string, defaultValue?: any): any => {
+  const recursive = (def: ITypeDef, name: string, defaultValue?: any, forceRequired?: boolean): any => {
     switch(def.type){
     case Typ.Str:
     case Typ.Int:
@@ -162,22 +192,53 @@ function parseParameters(rootDef: ITypeDef, inside: "header" | "path" | "query")
     case Typ.EnumLiteral:
     case Typ.Arr:
     case Typ.Set:
-    case Typ.Map:
-    case Typ.Union:{
+    case Typ.Map:{
       const param = {
         in:       inside,
         name,
-        required: def.required,
-        schema:   parseSchema(def, defaultValue),
+        required: forceRequired ?? def.required,
+        schema:   parseSchema(def, "req", defaultValue),
       }
-      parameters.push(param)
+      const existing = parameters.find(p => p.name === name)
+      if(existing){
+        if(!existing.schema.oneOf){
+          existing.schema = {
+            oneOf: [ existing.schema ],
+          }
+        }
+        existing.schema.oneOf.push(param.schema)
+      }else{
+        parameters.push(param)
+      }
+      break
+    }
+    case Typ.Union:{
+      // _typ options
+      parameters.push({
+        in:       inside,
+        name:     `${ name }._typ`,
+        required: def.required,
+        schema:   {
+          enum: Array.from(Object.keys(def.values)),
+          type: "string",
+        },
+      })
+      // values
+      for(const [ typ, t ] of Object.entries(def.values)){
+        if(Typ[typ as any as Typ]){
+          recursive(t, getObjPath(name, "value"), undefined, false)
+        } else{
+        // is class
+          recursive(t, name, undefined, false)
+        }
+      }
       break
     }
     case Typ.Class:{
       // loop through class properties
       const instance: any = new def.ctor()
       for(const property of def.properties){
-        recursive(property, getObjPath(name, property.name), instance[property.name])
+        recursive(property, getObjPath(name, property.name), instance[property.name], forceRequired)
       }
       break
     }
@@ -193,9 +254,9 @@ function swaggerRoot(basePath: string, host: string, schemas: any, paths: any, t
     components: {
       schemas,
       securitySchemes: {
-        "X-Unibet-Authorization": {
+        "X-Authorization": {
           in:   "header",
-          name: "X-Unibet-Authorization",
+          name: "X-Authorization",
           type: "apiKey",
         },
       },
@@ -206,7 +267,7 @@ function swaggerRoot(basePath: string, host: string, schemas: any, paths: any, t
     },
     info: {
       description: "Api documentation",
-      title:       "Swagger BFF",
+      title:       "Swagger",
       version:     "1.0.5",
     },
     openapi: "3.0.1",
@@ -233,8 +294,8 @@ function swaggerHandler({ api }: IApiHandlerClass<any, any>){
   return {
     components: {
       schemas: {
-        [msgName]:  parseSchema(typeDef),
-        [respName]: parseSchema(getOrCreateClassDef(api.response as any)),
+        [msgName]:  parseSchema(typeDef, "req"),
+        [respName]: parseSchema(getOrCreateClassDef(api.response as any), "res"),
       },
     },
     paths: {
@@ -269,9 +330,10 @@ function swaggerHandler({ api }: IApiHandlerClass<any, any>){
 }
 
 export default class ApiSwaggerMiddleware implements IApiMiddleware{
-  static readonly inject = [ SystemContainer, ApiServerConfig ]
+  static readonly inject = [ Logger, SystemContainer, ApiServerConfig ]
 
-  constructor(private readonly system: SystemContainer,
+  constructor(private readonly log: Logger,
+              private readonly system: SystemContainer,
               private readonly config: ApiServerConfig){}
 
   createMiddleware(){
@@ -290,7 +352,7 @@ export default class ApiSwaggerMiddleware implements IApiMiddleware{
     // Custom template for swagger api
     router.get(swaggerUrl, (req, res, next) => {
       const docsUrl = new URL(`${ req.protocol }://${ req.get("host") }${ req.path.replace(/\/+$/, "") }/docs.json`)
-      res.send(swaggerHtmlTemplate(docsUrl.href))
+      res.send(swaggerHtmlTemplate(docsUrl.href, this.config.swaggerUrlPrefix.replace(/\/+$/, "")))
     })
     // Dynamically generated swagger definition
     router.get(`${ swaggerUrl }/docs.json`, (req, res, next) => {
@@ -300,5 +362,9 @@ export default class ApiSwaggerMiddleware implements IApiMiddleware{
     // Static assets to display swagger ui
     router.use(swaggerUrl, express.static(absolutePath()))
     return router
+  }
+
+  async startup(){
+    await this.log.info(`Swagger Docs http://localhost:${ this.config.port }${ this.config.swaggerUrlPrefix }`)
   }
 }
