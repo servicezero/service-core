@@ -110,7 +110,7 @@ export function compile<T>(files: Map<string, string>, options?: ts.CompilerOpti
     moduleResolution: ts.ModuleResolutionKind.NodeJs,
     noEmitOnError:    true,
     noImplicitAny:    true,
-    target:           ts.ScriptTarget.ES2020,
+    target:           ts.ScriptTarget.ES2017,
     ...options,
   }, transformFactory, transformFactoryOptions)
 }

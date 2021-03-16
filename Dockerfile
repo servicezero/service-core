@@ -32,6 +32,8 @@ COPY . .
 
 # Install dependencies
 RUN npm ci
+# Enforce linting
+RUN npm run lint
 # Build for testing
 RUN npm run build:cjs
 RUN npm run build:esm

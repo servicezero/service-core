@@ -24,6 +24,8 @@ export default class ApiServer{
   startup(){
     const port = this.config.port
     this.exp = express()
+    // settings
+    this.exp.set("trust proxy", "loopback")
     // find all middleware from system
     const middlewares = this.system.findAllInstances(isApiMiddleware)
     // register into express

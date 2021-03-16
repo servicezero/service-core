@@ -21,7 +21,10 @@ const mockReqToLabels = jest.fn()
 const mockLabels = {
   correlationId: "c1",
 }
-const mockConfig = new ApiServerConfig("/api", 3000, "/swag", mockReqToLabels)
+const mockConfig = {
+  apiRequestToLogLabels: mockReqToLabels,
+  apiUrlPrefix:          "/api",
+}
 const mockReq = {
   body:   {},
   method: "GET",
@@ -65,7 +68,7 @@ class HandlerB implements IApiHandler<MsgB, RespB>{
 }
 
 describe("api handler middleware", () => {
-  const apiHandlers = new ApiHandlerMiddleware(mockLogger as any, mockSystem as any, mockConfig)
+  const apiHandlers = new ApiHandlerMiddleware(mockLogger as any, mockSystem as any, mockConfig as any)
   let middleware: Router
 
   beforeEach(() => {
