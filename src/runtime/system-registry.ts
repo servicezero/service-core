@@ -7,12 +7,12 @@ export interface ICtor<T>{
 }
 
 export interface IConfigCtor<T, K extends string>{
-  readonly envConfigPrefix: string extends K ? never : K
+  readonly configNamespace: string extends K ? never : K
   new (...args: any[]): T
 }
 
 export function isConfigCtor(o: any): o is IConfigCtor<any, any>{
-  return o !== null && o !== undefined && typeof o.envConfigPrefix === "string"
+  return o !== null && o !== undefined && typeof o.configNamespace === "string"
 }
 
 export interface ISystemServiceShutdown{

@@ -21,7 +21,7 @@ const shutdownMock = jest.fn()
 
 class ConfigA{
   static readonly class: IClassSpec<ConfigA>
-  static readonly envConfigPrefix = "ConfigA"
+  static readonly configNamespace = "ConfigA"
 
   constructor(
     readonly foo: string = "def1",
@@ -30,7 +30,7 @@ class ConfigA{
 }
 class ConfigB{
   static readonly class: IClassSpec<ConfigB>
-  static readonly envConfigPrefix = "ConfigB"
+  static readonly configNamespace = "ConfigB"
 
   constructor(
     readonly count: number = 4,

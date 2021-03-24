@@ -32,11 +32,12 @@ COPY . .
 
 # Install dependencies
 RUN npm ci
-# Enforce linting
-RUN npm run lint
-# Build for testing
+# Build for lint and testing
 RUN npm run build:cjs
 RUN npm run build:esm
+# Enforce linting
+RUN npm run lint
+# Enforce tests pass
 RUN npm run test
 # Clean and then release
 RUN rm -rf build

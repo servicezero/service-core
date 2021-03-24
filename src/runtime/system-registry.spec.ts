@@ -9,7 +9,7 @@ const shutdownMock = jest.fn()
 const startupMock = jest.fn()
 
 class ConfigA{
-  static readonly envConfigPrefix = "ConfigA"
+  static readonly configNamespace = "ConfigA"
 
   bar!: string
   foo!: string
@@ -19,7 +19,7 @@ class ConfigB extends ConfigA{
 class ConfigBO extends ConfigB{
 }
 class ConfigC{
-  static readonly envConfigPrefix = "ConfigC"
+  static readonly configNamespace = "ConfigC"
 
   cool!: string
   yep!: number
@@ -317,6 +317,17 @@ describe("system container", () => {
     expect(startupMock).toHaveBeenCalledTimes(1)
   })
 
+  it("startup throws timeout exception", async() => {
+    startupMock.mockResolvedValueOnce(new Promise(() => {
+      // nothing
+    }))
+    const serviceB = container.getInstance(ServiceB)
+    const prom = container.startupService(serviceB)
+    jest.advanceTimersToNextTimer()
+    await expect(prom).rejects.toThrow(TimeoutException)
+    expect(startupMock).toHaveBeenCalledTimes(1)
+  })
+
   it("startup service when already running does nothing", async() => {
     const serviceB = container.getInstance(ServiceB)
     await container.startupService(serviceB)
@@ -332,10 +343,33 @@ describe("system container", () => {
     expect(shutdownMock).toHaveBeenCalledTimes(1)
   })
 
+  it("shutdown throws timeout exception", async() => {
+    shutdownMock.mockResolvedValueOnce(new Promise(() => {
+      // nothing
+    }))
+    const serviceB = container.getInstance(ServiceB)
+    await container.startupService(serviceB)
+    const prom = container.shutdownService(serviceB)
+    jest.advanceTimersToNextTimer()
+    await expect(prom).rejects.toThrow(TimeoutException)
+    expect(startupMock).toHaveBeenCalledTimes(1)
+    expect(shutdownMock).toHaveBeenCalledTimes(1)
+  })
+
   it("shutdown service when not running does nothing", async() => {
     const serviceB = container.getInstance(ServiceB)
     await container.shutdownService(serviceB)
     expect(shutdownMock).toHaveBeenCalledTimes(0)
+  })
+
+  it("has external health check", async() => {
+    class ServA{}
+    class ServB{
+      externalHealthCheck = jest.fn()
+    }
+    expect(hasExternalHealthCheck(undefined)).toBeFalsy()
+    expect(hasExternalHealthCheck(new ServA())).toBeFalsy()
+    expect(hasExternalHealthCheck(new ServB())).toBeTruthy()
   })
 
 })

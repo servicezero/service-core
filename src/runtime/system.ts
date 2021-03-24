@@ -31,7 +31,7 @@ export class System<EnvConfig = {}> extends SystemContainer<EnvConfig>{
 
   protected createConfigInstance(envConf: Record<string, any>, cls: IConfigCtor<any, any>){
     // extract all properties for the config
-    const prefix = `${ cls.envConfigPrefix }.`
+    const prefix = `${ cls.configNamespace }.`
     const props = Object.fromEntries(
       Object.entries(envConf)
         .filter(([ k ]) => k.startsWith(prefix))
@@ -52,7 +52,7 @@ export class System<EnvConfig = {}> extends SystemContainer<EnvConfig>{
     for(const cls of this.registry.configs){
       if(isConfigCtor(cls) && cls.class){
         for(const key of Object.keys(cls.class)){
-          const envKey = `${ cls.envConfigPrefix }.${ key }`
+          const envKey = `${ cls.configNamespace }.${ key }`
           const envVal = envVars.get(envKey.toLowerCase())
           if(envVal !== null && envVal !== undefined){
             envConf[envKey] = envVal

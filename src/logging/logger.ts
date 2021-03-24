@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
 import { AsyncLocalStorage } from "async_hooks"
+import fs from "fs"
 
 export interface ILogLabels{
   readonly [key: string]: boolean | number | string | undefined
@@ -68,6 +69,17 @@ export const dockerLogWriter: ILogWriter = async entry => {
   // eslint-disable-next-line no-console
   console.log(JSON.stringify(entry))
 }
+export const dockerDevLogWriter = (): ILogWriter => {
+  const consoleLogger = consoleLogWriter(false)
+  const stdoutPc1 = fs.createWriteStream("/proc/1/fd/1", { encoding: "utf-8", flags: "a" })
+
+  return async entry => {
+    const json = JSON.stringify(entry) + "\n"
+    await consoleLogger(entry)
+    stdoutPc1.write(json)
+  }
+}
+
 function composeRedactors(redactors: readonly ILogRedactor[]): ILogRedactor{
   return (property, value) => redactors.some(r => r(property, value))
 }
