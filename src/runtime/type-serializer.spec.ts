@@ -203,6 +203,14 @@ class UnionClasses{
   constructor(public uni: UnionClassA | UnionClassB){}
 }
 
+interface IMod{
+  readonly name: string
+}
+class InterfaceClass{
+  static readonly class: IClassSpec<InterfaceClass>
+  constructor(readonly items: IMod[]){}
+}
+
 const value = new ModelFull(
   "v1",
   12,
@@ -306,6 +314,12 @@ it("serializes / deserializes json model on root path", () => {
 it("serializes / deserializes json sets and maps", () => {
   const serialized = serializeTypeToJson(Iterables, iters)
   expect(deserializeTypeFromJson(Iterables, JSON.stringify(serialized))).toEqual(iters)
+})
+
+it("serializes / deserializes interface types", () => {
+  const val = new InterfaceClass([ { name: "v1" }, { name: "v2" } ])
+  const serialized = serializeTypeToJson(InterfaceClass, val)
+  expect(deserializeTypeFromJson(InterfaceClass, JSON.stringify(serialized))).toEqual(val)
 })
 
 it("throws when cannot find type definition", () => {

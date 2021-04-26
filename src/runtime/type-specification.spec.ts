@@ -148,6 +148,17 @@ class UnionClasses{
   constructor(public uni: Map<string, string> | string[] | UnionClassA | UnionClassB | number | string){}
 }
 
+class InterfaceClass{
+  static class = {
+    events: [ "Arr", {
+      class: {
+        name: "Str",
+      },
+      name: "IBla",
+    } ],
+  };
+}
+
 const fullModelSpec = getOrCreateClassDef(FullModel)
 const literalsSpec = getOrCreateClassDef(LiteralTypesModel)
 const pathSpec = getOrCreateClassDef(PathSerialization)
@@ -159,6 +170,10 @@ it("is ctor schema class", () => {
   })).toBeTruthy()
   expect(isCtorSchema(class Foo{
     static class = {}
+  })).toBeTruthy()
+  expect(isCtorSchema({
+    class: {},
+    name:  "Name",
   })).toBeTruthy()
   expect(isCtorSchema(class{})).toBeFalsy()
   expect(isCtorSchema(function(cool = 10){
@@ -191,6 +206,19 @@ it("specification to type definition primitive or undefined", () => {
   expect(fullModelSpec.propertiesByName["boolOpt"]).toEqual({ name: "boolOpt", required: false, type: Typ.Bool })
   expect(fullModelSpec.propertiesByName["dateOpt"]).toEqual({ name: "dateOpt", required: false, type: Typ.Date })
   expect(fullModelSpec.propertiesByName["buffOpt"]).toEqual({ name: "buffOpt", required: false, type: Typ.Buff })
+})
+
+it("specification to type definition interfaces", () => {
+  const def = getOrCreateClassDef(InterfaceClass)
+  expect((def.propertiesByName["events"] as any).valType).toEqual(expect.objectContaining({
+    properties: [
+      expect.objectContaining({
+        name: "name",
+        type: Typ.Str,
+      }),
+    ],
+    type: Typ.Class,
+  }))
 })
 
 it("specification to type definition literal types", () => {

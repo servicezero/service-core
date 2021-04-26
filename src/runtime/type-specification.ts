@@ -336,7 +336,13 @@ export function asEnum<T>(enumType: T): IEnumConstraint<T[keyof T]>{
   return enumType as any
 }
 export function isCtorSchema(value: any): value is ICtorSchema<unknown>{
-  return typeof value === "function" && value.toString().startsWith("class ") && value.class !== null && value.class !== undefined && typeof value.class === "object"
+  if(value === null || value === undefined)return false
+
+  return ((typeof value === "function" && (value.toString().startsWith("class ")))
+          || (typeof value === "object" && value.constructor === Object))
+         && value.class !== null
+         && value.class !== undefined
+         && typeof value.class === "object"
 }
 function getSerializer(valType: ITypeDef, keyType?: ITypeDef, serializer?: unknown): Serializer{
   switch(serializer){
@@ -399,10 +405,19 @@ function classSpecToPropDefs(spec: any, required = true, reg = new Map<ICtorSche
       }
       return ret
     }
+    // ensure it's a class for interface declarations
+    let ctor = spec
+    if(typeof spec === "object"){
+      ctor = class InterfaceClass{
+        static readonly class = spec.class
+      }
+      Object.defineProperty(ctor, "name", { value: (spec as any).name })
+    }
+
     // first create an entry to add into registry
     // to handle recursion references
     const properties: IPropDef[] = []
-    const classDef: Mutable<ITypeDefClass> = { ctor: spec, properties, propertiesByName: {}, required, type: Typ.Class, typeName: spec.name }
+    const classDef: Mutable<ITypeDefClass> = { ctor, properties, propertiesByName: {}, required, type: Typ.Class, typeName: spec.name }
     reg.set(spec, classDef)
 
     const innerDef: any = classDef.propertiesByName
